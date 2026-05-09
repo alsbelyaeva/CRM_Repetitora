@@ -1,0 +1,720 @@
+# backend/openapi.yaml
+openapi: 3.0.0
+info:
+  title: CRM System API
+  description: API для CRM системы индивидуального специалиста
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://192.168.56.104:4000
+    description: Development server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        passwordHash:
+          type: string
+        fullName:
+          type: string
+        address:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, TEACHER]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+
+    Client:
+      type: object
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        address:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        notes:
+          type: string
+        vip:
+          type: boolean
+        tags:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+        userId:
+          type: string
+          format: uuid
+
+    Lesson:
+      type: object
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        userId:
+          type: string
+          format: uuid
+        startTime:
+          type: string
+          format: date-time
+        durationMin:
+          type: integer
+        type:
+          type: string
+        status:
+          type: string
+          enum: [PLANNED, DONE, CANCELLED]
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        lessonId:
+          type: integer
+        amount:
+          type: number
+          format: decimal
+        method:
+          type: string
+        dateTime:
+          type: string
+          format: date-time
+        note:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    SlotRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        proposedSlots:
+          type: object
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    SlotWeight:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+          format: uuid
+        wTime:
+          type: number
+          format: float
+        wCompact:
+          type: number
+          format: float
+        wWeekday:
+          type: number
+          format: float
+        wPriority:
+          type: number
+          format: float
+        wTravel:
+          type: number
+          format: float
+        desiredBreakMinutes:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SlotProposal:
+      type: object
+      required:
+        - from
+        - to
+      properties:
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+
+    RankedSlot:
+      allOf:
+        - $ref: '#/components/schemas/SlotProposal'
+        - type: object
+          properties:
+            score:
+              type: number
+              format: float
+            breakdown:
+              type: object
+              properties:
+                timeScore:
+                  type: number
+                compactScore:
+                  type: number
+                weekdayScore:
+                  type: number
+                priorityScore:
+                  type: number
+                travelScore:
+                  type: number
+            travelScore:
+              type: number
+            travelTimeMinutes:
+              type: integer
+              nullable: true
+            availableGapMinutes:
+              type: integer
+              nullable: true
+            travelDetails:
+              type: object
+              properties:
+                explanation:
+                  type: string
+                desiredBreakMinutes:
+                  type: integer
+            explanation:
+              type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Регистрация пользователя
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  description: Минимум 8 символов, цифра, строчная и заглавная латинские буквы, без простых шаблонов
+                fullName:
+                  type: string
+                role:
+                  type: string
+                  enum: [ADMIN, TEACHER]
+                  default: TEACHER
+      responses:
+        '201':
+          description: Успешная регистрация
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Вход в систему
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Неверные учетные данные
+
+  /api/auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Получить текущего пользователя
+      responses:
+        '200':
+          description: Данные пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Не авторизован
+
+  /api/auth/password:
+    patch:
+      tags:
+        - Auth
+      summary: Изменить пароль текущего пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+                - confirmPassword
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+                  description: Минимум 8 символов, цифра, строчная и заглавная латинские буквы, без простых шаблонов
+                confirmPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Пароль успешно изменен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Ошибка валидации или неверный текущий пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Не авторизован
+
+  /api/clients:
+    get:
+      tags:
+        - Clients
+      summary: Получить список клиентов
+      responses:
+        '200':
+          description: Список клиентов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Client'
+
+    post:
+      tags:
+        - Clients
+      summary: Создать клиента
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fullName
+                - userId
+              properties:
+                fullName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                notes:
+                  type: string
+                vip:
+                  type: boolean
+                  default: false
+                tags:
+                  type: object
+                userId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Клиент создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+
+  /api/clients/{id}:
+    get:
+      tags:
+        - Clients
+      summary: Получить клиента по ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Данные клиента
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '404':
+          description: Клиент не найден
+
+    put:
+      tags:
+        - Clients
+      summary: Обновить клиента
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                notes:
+                  type: string
+                vip:
+                  type: boolean
+                tags:
+                  type: object
+      responses:
+        '200':
+          description: Клиент обновлен
+
+    delete:
+      tags:
+        - Clients
+      summary: Удалить клиента (soft delete)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Клиент удален
+
+  /api/lessons:
+    get:
+      tags:
+        - Lessons
+      summary: Получить список занятий
+      responses:
+        '200':
+          description: Список занятий
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Lesson'
+
+    post:
+      tags:
+        - Lessons
+      summary: Создать занятие
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - clientId
+                - startTime
+                - durationMin
+                - type
+              properties:
+                clientId:
+                  type: integer
+                userId:
+                  type: string
+                  format: uuid
+                startTime:
+                  type: string
+                  format: date-time
+                durationMin:
+                  type: integer
+                type:
+                  type: string
+                status:
+                  type: string
+                  enum: [PLANNED, DONE, CANCELLED]
+                  default: PLANNED
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Занятие создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lesson'
+
+  /api/payments:
+    get:
+      tags:
+        - Payments
+      summary: Получить список платежей
+      responses:
+        '200':
+          description: Список платежей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+
+    post:
+      tags:
+        - Payments
+      summary: Создать платеж
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - clientId
+                - amount
+                - method
+              properties:
+                clientId:
+                  type: integer
+                lessonId:
+                  type: integer
+                amount:
+                  type: number
+                  format: decimal
+                method:
+                  type: string
+                dateTime:
+                  type: string
+                  format: date-time
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Платеж создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+
+  /api/slots/rank:
+    post:
+      tags:
+        - Smart Slotting
+      summary: Ранжировать предложенные слоты
+      description: |
+        Использует Weighted Scoring Model для ранжирования слотов.
+        Формула: Score = w_time × c_time + w_compact × c_compact + w_weekday × c_weekday + w_priority × c_priority
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - proposedSlots
+              properties:
+                clientId:
+                  type: integer
+                userId:
+                  type: string
+                  format: uuid
+                proposedSlots:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SlotProposal'
+      responses:
+        '200':
+          description: Слоты отранжированы
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rankedSlots:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RankedSlot'
+                  weights:
+                    type: object
+                  clientVip:
+                    type: boolean
+
+  /api/slot-weights/{userId}:
+    get:
+      tags:
+        - Smart Slotting
+      summary: Получить веса критериев
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Веса критериев
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotWeight'
+
+    put:
+      tags:
+        - Smart Slotting
+      summary: Обновить веса критериев
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                wTime:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                wCompact:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                wWeekday:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                wPriority:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+      responses:
+        '200':
+          description: Веса обновлены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotWeight'

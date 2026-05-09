@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:13
+    container_name: ais-postgres
+    restart: always
+    environment:
+      TZ: Europe/Moscow
+      POSTGRES_DB: ais_db
+      POSTGRES_USER: ais_user
+      POSTGRES_PASSWORD: ais_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    image: node:18
+    container_name: ais-backend
+    working_dir: /app
+    volumes:
+      - ./ais-main:/app
+    command: sh -c "npm install && npx prisma generate && npm run dev"
+    ports:
+      - "4000:4000"
+      - "5557:5557"
+    depends_on:
+      - db
+    environment:
+      TZ: Europe/Moscow
+      DATABASE_URL: ${DATABASE_URL:-postgresql://ais_user:ais_password@db:5432/ais_db}
+      HOST: 0.0.0.0
+      PORT: ${PORT:-4000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TWO_GIS_API_KEY: ${TWO_GIS_API_KEY:-}
+      PRISMA_STUDIO_PORT: 5555
+
+  frontend:
+    image: node:18
+    container_name: ais-frontend
+    working_dir: /app
+    volumes:
+      - ./ais-frontend:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

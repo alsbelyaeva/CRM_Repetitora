@@ -1,0 +1,248 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  fullName      String?        @map("full_name")
+  address       String?
+  telegramChatId String?       @map("telegram_chat_id")
+  role          UserRole
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @default(now()) @updatedAt
+  deletedAt     DateTime?
+  auditLogs     AuditLog[]
+  clients       Client[]
+  lessons       Lesson[]
+  notifications Notification[]
+  passwordResetTokens PasswordResetToken[]
+  recurringSeries RecurringSeries[]
+  scheduleEvents ScheduleEvent[]
+  slotRequests  SlotRequest[]
+  slotWeights   SlotWeight?
+}
+
+model Client {
+  id           Int           @id @default(autoincrement())
+  address      String?
+  telegramChatId String?     @map("telegram_chat_id")
+  phone        String?
+  email        String?       @unique
+  notes        String?
+  vip          Boolean       @default(false)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  deletedAt    DateTime?     @map("deleted_at")
+  fullName     String        @map("full_name")
+  tags         Json?
+  userId       String        @map("user_id")
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessons      Lesson[]
+  payments     Payment[]
+  recurringSeries RecurringSeries[]
+  slotRequests SlotRequest[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([userId])
+}
+
+model Lesson {
+  id          Int          @id @default(autoincrement())
+  type        String
+  clientId    Int          @map("client_id")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  durationMin Int          @map("duration_min")
+  notes       String?
+  startTime   DateTime     @map("start_time")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  userId      String?      @map("user_id")
+  status      LessonStatus @default(PLANNED)
+  recurringSeriesId Int?   @map("recurring_series_id")
+  client      Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  recurringSeries RecurringSeries? @relation(fields: [recurringSeriesId], references: [id], onDelete: SetNull)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments    Payment[]
+  telegramNotificationLogs TelegramNotificationLog[]
+
+  @@index([startTime])
+  @@index([userId, startTime])
+  @@index([recurringSeriesId])
+}
+
+model TelegramNotificationLog {
+  id           Int      @id @default(autoincrement())
+  lessonId     Int      @map("lesson_id")
+  reminderType String   @map("reminder_type")
+  channel      String   @default("TELEGRAM")
+  recipientType String  @map("recipient_type")
+  recipientId   String  @map("recipient_id")
+  chatId       String?  @map("chat_id")
+  status       String
+  error        String?
+  sentAt       DateTime @default(now()) @map("sent_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, reminderType, channel, recipientType, recipientId])
+  @@index([status])
+  @@index([sentAt])
+}
+
+model RecurringSeries {
+  id          Int      @id @default(autoincrement())
+  clientId    Int      @map("client_id")
+  userId      String   @map("user_id")
+  weekday     Int
+  startTime   String   @map("start_time")
+  durationMin Int      @map("duration_min")
+  type        String
+  notes       String?
+  startsOn    DateTime @map("starts_on") @db.Date
+  endsOn      DateTime? @map("ends_on") @db.Date
+  repeatCount Int?     @map("repeat_count")
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([status])
+}
+
+model ScheduleEvent {
+  id          Int                 @id @default(autoincrement())
+  userId      String              @map("user_id")
+  title       String
+  startTime   DateTime            @map("start_time")
+  durationMin Int                 @map("duration_min")
+  type        ScheduleEventType   @default(PERSONAL)
+  location    String?
+  latitude    Float?
+  longitude   Float?
+  notes       String?
+  status      ScheduleEventStatus @default(ACTIVE)
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startTime])
+  @@index([status])
+  @@index([type])
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String
+  clientId  Int      @map("client_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  dateTime  DateTime @map("date_time")
+  lessonId  Int?     @map("lesson_id")
+  note      String?
+  client    Client   @relation(fields: [clientId], references: [id])
+  lesson    Lesson?  @relation(fields: [lessonId], references: [id])
+
+  @@index([clientId])
+  @@index([dateTime])
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model SlotRequest {
+  id            Int      @id @default(autoincrement())
+  clientId      Int      @map("client_id")
+  proposedSlots Json     @map("proposed_slots")
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now()) @map("created_at")
+  userId        String   @map("user_id")
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([status])
+}
+
+model SlotWeight {
+  id             Int      @id @default(autoincrement())
+  desiredBreakMinutes Int  @default(30) @map("desired_break_minutes")
+  workingDays    Json     @default("[1, 2, 3, 4, 5]") @map("working_days")
+  createdAt      DateTime @default(now()) @map("created_at")
+  gapImportance  Float    @default(0.5) @map("gap_importance")
+  maxGapMinutes  Int      @default(180) @map("max_gap_minutes")
+  minGapMinutes  Int      @default(60) @map("min_gap_minutes")
+  preferredTimes Json     @default("{}") @map("preferred_times")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  userId         String   @unique @map("user_id")
+  wCompact       Float    @default(0.3) @map("w_compact")
+  wPriority      Float    @default(0.2) @map("w_priority")
+  wTime          Float    @default(0.3) @map("w_time")
+  wTravel        Float    @default(0.15) @map("w_travel")
+  wWorkingDay    Float    @default(0.2) @map("w_working_day")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+}
+
+enum LessonStatus {
+  PLANNED
+  DONE
+  CANCELLED
+}
+
+enum ScheduleEventType {
+  PERSONAL
+  TRAVEL
+  OTHER
+}
+
+enum ScheduleEventStatus {
+  ACTIVE
+  CANCELLED
+}
