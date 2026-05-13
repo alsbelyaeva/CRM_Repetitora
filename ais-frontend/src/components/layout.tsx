@@ -52,33 +52,33 @@ export default function Layout() {
       key={item.path}
       to={item.path}
       onClick={() => setMobileMenuOpen(false)}
-      className={`flex items-center px-6 py-3 text-gray-700 transition-colors ${
+      className={`flex items-center px-4 lg:px-6 py-3 text-gray-700 transition-colors ${
         isActivePath(item.path)
           ? 'bg-blue-50 text-blue-700 font-semibold'
           : 'hover:bg-blue-50 hover:text-blue-600'
       }`}
     >
-      <item.icon className="w-5 h-5 mr-3" />
-      {item.label}
+      <item.icon className="w-5 h-5 mr-3 shrink-0" />
+      <span className="truncate">{item.label}</span>
     </Link>
   );
 
   const sidebarContent = (
     <>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-800">CRM Система</h1>
+      <div className="p-4 lg:p-6 shrink-0">
+        <h1 className="text-xl lg:text-2xl font-bold text-gray-800">CRM Система</h1>
         <p className="text-sm text-gray-600 mt-1 break-words">{user?.fullName || user?.email}</p>
         <span className="inline-block mt-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
           {user?.role === 'ADMIN' ? 'Администратор' : 'Преподаватель'}
         </span>
       </div>
 
-      <nav className="mt-2 pb-24">
+      <nav className="mt-2 flex-1 overflow-y-auto pb-3">
         {menuItems.map(renderMenuLink)}
 
         {user?.role === 'ADMIN' && (
           <>
-            <div className="px-6 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            <div className="px-4 lg:px-6 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
               Администрирование
             </div>
             {adminMenuItems.map(renderMenuLink)}
@@ -86,21 +86,21 @@ export default function Layout() {
         )}
       </nav>
 
-      <div className="absolute bottom-0 w-64 p-6 bg-white">
+      <div className="shrink-0 p-4 lg:p-6 bg-white border-t border-gray-100">
         <button
           onClick={handleLogout}
           className="flex items-center w-full min-h-[44px] px-4 py-2 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
         >
-          <LogOut className="w-5 h-5 mr-3" />
-          Выйти
+          <LogOut className="w-5 h-5 mr-3 shrink-0" />
+          <span className="truncate">Выйти</span>
         </button>
       </div>
     </>
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 md:flex md:h-screen overflow-x-hidden">
-      <aside className="hidden md:block md:w-64 md:shrink-0 bg-white shadow-md relative overflow-y-auto">
+    <div className="min-h-screen w-full max-w-full bg-gray-100 md:flex md:h-screen overflow-x-hidden">
+      <aside className="hidden md:flex md:w-56 lg:w-64 md:shrink-0 bg-white shadow-md overflow-hidden flex-col">
         {sidebarContent}
       </aside>
 
@@ -127,7 +127,7 @@ export default function Layout() {
             onClick={() => setMobileMenuOpen(false)}
             aria-label="Закрыть меню"
           />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[86vw] bg-white shadow-xl overflow-y-auto">
+          <aside className="absolute left-0 top-0 bottom-0 w-72 max-w-[86vw] bg-white shadow-xl overflow-hidden flex flex-col">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(false)}
@@ -141,7 +141,7 @@ export default function Layout() {
         </div>
       )}
 
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 min-w-0">
+      <main className="flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden p-4 sm:p-6 md:p-6 xl:p-8">
         <Outlet />
       </main>
     </div>

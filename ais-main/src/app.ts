@@ -30,8 +30,39 @@ const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .map(origin => origin.trim())
   .filter(Boolean);
 
+function isAllowedDevOrigin(origin: string) {
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    const isFrontendPort = url.port === '5173';
+    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(hostname);
+    const isPrivateNetwork = (
+      /^10\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+    );
+
+    return isFrontendPort && (isLocalhost || isPrivateNetwork);
+  } catch {
+    return false;
+  }
+}
+
 app.use(cors({
-  origin: allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins,
+  origin(origin, callback) {
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    const configuredOrigins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
+    if (configuredOrigins.includes(origin) || isAllowedDevOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS origin is not allowed: ${origin}`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

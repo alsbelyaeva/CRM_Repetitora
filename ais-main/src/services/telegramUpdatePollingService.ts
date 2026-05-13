@@ -54,10 +54,9 @@ async function handleStartCommand(update: TelegramUpdate) {
   const telegramChatId = String(chatId);
 
   if (payload.type === 'teacher') {
-    const user = await prisma.user.update({
+    const user = await prisma.user.findUnique({
       where: { id: payload.id },
-      data: { telegramChatId },
-      select: { id: true, fullName: true, email: true },
+      select: { id: true, fullName: true, email: true, role: true },
     }).catch(() => null);
 
     if (!user) {
@@ -65,6 +64,20 @@ async function handleStartCommand(update: TelegramUpdate) {
       await telegramNotificationService.sendMessage(telegramChatId, 'Не удалось подключить Telegram: пользователь не найден.');
       return;
     }
+
+    if (user.role !== 'TEACHER') {
+      console.log(`[Telegram] /start teacher: пользователь ${payload.id} имеет роль ${user.role}, подключение отклонено`);
+      await telegramNotificationService.sendMessage(
+        telegramChatId,
+        'Telegram-уведомления по занятиям доступны только для аккаунта преподавателя.'
+      );
+      return;
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { telegramChatId },
+    });
 
     console.log(`[Telegram] Подключен преподаватель ${user.id} к chat_id=${telegramChatId}`);
     await telegramNotificationService.sendMessage(telegramChatId, 'Telegram подключен к аккаунту преподавателя.');

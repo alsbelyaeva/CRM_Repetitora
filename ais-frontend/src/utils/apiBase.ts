@@ -4,6 +4,23 @@ function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, '');
 }
 
+function getHostname(value: string) {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return '';
+  }
+}
+
+function isPrivateNetworkHost(hostname: string) {
+  return (
+    LOCAL_HOSTS.includes(hostname) ||
+    /^10\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+  );
+}
+
 export function getApiUrl() {
   const envUrl = import.meta.env.VITE_API_URL
     ? trimTrailingSlash(String(import.meta.env.VITE_API_URL).replace(/^['"]|['"]$/g, ''))
@@ -15,10 +32,15 @@ export function getApiUrl() {
 
   const hostname = window.location.hostname;
   const isLocalPage = LOCAL_HOSTS.includes(hostname);
-  const envIsLocal = envUrl.includes('localhost') || envUrl.includes('127.0.0.1');
+  const envHostname = getHostname(envUrl);
+  const envIsDevHost = isPrivateNetworkHost(envHostname);
 
-  if (!isLocalPage && (!envUrl || envIsLocal)) {
-    return `${window.location.protocol}//${hostname}:4000`;
+  if (isLocalPage && (!envUrl || envIsDevHost)) {
+    return '';
+  }
+
+  if (!isLocalPage && (!envUrl || envIsDevHost)) {
+    return '';
   }
 
   return envUrl || 'http://localhost:4000';

@@ -113,7 +113,7 @@ export const create = async (req: Request, res: Response) => {
         passwordHash,
         fullName: fullName || null,
         address: address ? String(address).trim() : null,
-        telegramChatId: telegramChatId ? String(telegramChatId).trim() : null,
+        telegramChatId: role === 'ADMIN' ? null : telegramChatId ? String(telegramChatId).trim() : null,
         role: role as 'ADMIN' | 'TEACHER',
       },
       select: {
@@ -201,6 +201,14 @@ export const update = async (req: Request, res: Response) => {
     }
 
     const { email, fullName, address, telegramChatId, role, password } = req.body;
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { role: true },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
     
     const updateData: any = {};
     
@@ -229,13 +237,20 @@ export const update = async (req: Request, res: Response) => {
       updateData.address = address ? String(address).trim() : null;
     }
 
-    if (telegramChatId !== undefined) {
+    const targetRoleAfterUpdate = role !== undefined && currentUserRole === 'ADMIN'
+      ? role
+      : targetUser.role;
+
+    if (telegramChatId !== undefined && targetRoleAfterUpdate !== 'ADMIN') {
       updateData.telegramChatId = telegramChatId ? String(telegramChatId).trim() : null;
     }
     
     // Обновление роли (только для админов)
     if (role !== undefined && currentUserRole === 'ADMIN') {
       updateData.role = role;
+      if (role === 'ADMIN') {
+        updateData.telegramChatId = null;
+      }
     }
     
     // Обновление пароля

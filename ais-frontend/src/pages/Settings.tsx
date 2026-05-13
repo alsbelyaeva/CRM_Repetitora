@@ -403,7 +403,7 @@ export default function Settings() {
     return Math.round((value / totalWeight) * 100);
   };
 
-  const telegramConnectUrl = botInfo?.username && targetUserId
+  const telegramConnectUrl = !isAdmin && botInfo?.username && targetUserId
     ? `https://t.me/${botInfo.username}?start=teacher_${targetUserId}`
     : null;
 
@@ -494,8 +494,8 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4 md:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+        <div className="bg-white rounded-lg shadow p-4 md:p-6 overflow-hidden">
+          <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-6">
             <div className="flex items-start gap-3 min-w-0">
               <div className="w-10 h-10 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center shrink-0">
                 <MessageCircle className="w-5 h-5" />
@@ -512,10 +512,26 @@ export default function Settings() {
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">
-                  Откройте бота по персональной ссылке или QR-коду и нажмите Start. Chat ID сохранится автоматически.
+                  {isAdmin
+                    ? 'Администратор видит статус подключения выбранного преподавателя. Подключение выполняет сам преподаватель через свой личный кабинет.'
+                    : 'Откройте бота по персональной ссылке или QR-коду и нажмите Start. Chat ID сохранится автоматически.'}
                 </p>
 
-                {telegramConnectUrl ? (
+                {isAdmin ? (
+                  <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap gap-3 max-w-full">
+                    <button
+                      type="button"
+                      onClick={refreshTelegramConnectionStatus}
+                      className="inline-flex items-center justify-center w-full sm:w-auto border border-gray-300 text-gray-700 px-4 py-3 sm:py-2 rounded-lg hover:bg-gray-50 font-semibold"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Проверить подключение
+                    </button>
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+                      Ссылка и QR-код не показываются администратору, чтобы не привязать его Telegram к чужому расписанию.
+                    </div>
+                  </div>
+                ) : telegramConnectUrl ? (
                   <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap gap-3">
                     <button
                       type="button"
@@ -537,7 +553,7 @@ export default function Settings() {
                       value={telegramConnectUrl}
                       readOnly
                       onFocus={(event) => event.currentTarget.select()}
-                      className="min-w-0 w-full lg:w-[28rem] px-3 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-gray-50"
+                      className="min-w-0 w-full xl:max-w-[28rem] px-3 py-3 sm:py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-gray-50"
                     />
                   </div>
                 ) : (
@@ -550,8 +566,13 @@ export default function Settings() {
               </div>
             </div>
 
-            <div className="flex items-center justify-center lg:justify-end">
-              {telegramQrUrl ? (
+            <div className="flex items-center justify-center xl:justify-end shrink-0">
+              {isAdmin ? (
+                <div className="w-36 h-36 border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 text-center px-3">
+                  <QrCode className="w-8 h-8 mb-2" />
+                  <span className="text-xs">QR не требуется</span>
+                </div>
+              ) : telegramQrUrl ? (
                 <div className="border border-gray-200 rounded-lg p-3 bg-white">
                   <img
                     src={telegramQrUrl}

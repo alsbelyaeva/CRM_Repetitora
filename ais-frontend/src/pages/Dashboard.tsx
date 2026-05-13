@@ -90,7 +90,9 @@ export default function Dashboard() {
     { title: 'Активные запросы', value: stats.activeRequests, icon: TrendingUp, color: 'orange' },
   ];
 
-  const telegramConnectUrl = botInfo?.username && currentUser?.id
+  const isAdmin = currentUser?.role === 'ADMIN';
+
+  const telegramConnectUrl = !isAdmin && botInfo?.username && currentUser?.id
     ? `https://t.me/${botInfo.username}?start=teacher_${currentUser.id}`
     : null;
 
@@ -132,18 +134,26 @@ export default function Dashboard() {
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-xl font-semibold text-gray-800">Telegram-бот напоминаний</h2>
                 <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                  currentUser?.telegramChatId
+                  isAdmin
+                    ? 'bg-gray-100 text-gray-700'
+                    : currentUser?.telegramChatId
                     ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-gray-100 text-gray-700'
                 }`}>
-                  {currentUser?.telegramChatId ? 'Подключено' : 'Не подключено'}
+                  {isAdmin ? 'Не требуется' : currentUser?.telegramChatId ? 'Подключено' : 'Не подключено'}
                 </span>
               </div>
               <p className="text-sm text-gray-600 mt-2">
-                Подключите Telegram, чтобы получать напоминания о занятиях за 24 часа и за 1 час.
+                {isAdmin
+                  ? 'У администратора нет собственных занятий и клиентов, поэтому персональная подписка на напоминания не используется.'
+                  : 'Подключите Telegram, чтобы получать напоминания о занятиях за 24 часа и за 1 час.'}
               </p>
 
-              {telegramConnectUrl ? (
+              {isAdmin ? (
+                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+                  Статусы подключения преподавателей и клиентов доступны в разделах «Пользователи» и «Клиенты».
+                </div>
+              ) : telegramConnectUrl ? (
                 <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap gap-3">
                   <a
                     href={telegramConnectUrl}
@@ -172,7 +182,12 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center justify-center lg:justify-end">
-            {telegramQrUrl ? (
+            {isAdmin ? (
+              <div className="w-40 h-40 border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400 text-center px-3">
+                <QrCode className="w-8 h-8 mb-2" />
+                <span className="text-xs">QR не требуется</span>
+              </div>
+            ) : telegramQrUrl ? (
               <div className="border border-gray-200 rounded-lg p-3 bg-white">
                 <img
                   src={telegramQrUrl}

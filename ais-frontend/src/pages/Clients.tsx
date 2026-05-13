@@ -40,6 +40,7 @@ export default function Clients() {
   const [botInfo, setBotInfo] = useState<TelegramBotInfo | null>(null);
   const [copiedClientId, setCopiedClientId] = useState<number | null>(null);
   const [qrPreview, setQrPreview] = useState<{ clientName: string; url: string; connectUrl: string } | null>(null);
+  const [selectedClientProfile, setSelectedClientProfile] = useState<Client | null>(null);
 
   useEffect(() => {
     fetchBotInfo();
@@ -138,6 +139,13 @@ export default function Clients() {
       alert('Не удалось скопировать ссылку');
     }
   };
+
+  const selectedClientTelegramConnectUrl = selectedClientProfile
+    ? getTelegramConnectUrl(selectedClientProfile.id)
+    : null;
+  const selectedClientTelegramQrUrl = selectedClientProfile
+    ? getTelegramQrUrl(selectedClientProfile.id, 360)
+    : null;
 
   if (loading) {
     return <div className="text-center py-12">Загрузка...</div>;
@@ -315,37 +323,28 @@ export default function Clients() {
           )}
         </div>
 
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
+        <div className="hidden md:block overflow-hidden">
+          <table className="w-full table-fixed">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`${isAdmin ? 'w-[20%]' : 'w-[24%]'} px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}>
                   Имя
                 </th>
                 {isAdmin && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[16%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Преподаватель
                   </th>
                 )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email
+                <th className={`${isAdmin ? 'w-[23%]' : 'w-[30%]'} px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}>
+                  Контакты
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Адрес
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Телефон
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-[12%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Статус
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className={`${isAdmin ? 'w-[15%]' : 'w-[18%]'} px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}>
                   Telegram
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Дата создания
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="w-[14%] px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Действия
                 </th>
               </tr>
@@ -353,152 +352,221 @@ export default function Clients() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredClients.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 8} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={isAdmin ? 6 : 5} className="px-6 py-12 text-center text-gray-500">
                     Клиенты не найдены
                   </td>
                 </tr>
               ) : (
-                filteredClients.map((client) => {
-                  const telegramConnectUrl = getTelegramConnectUrl(client.id);
-                  const telegramQrUrl = getTelegramQrUrl(client.id);
-                  const telegramQrPreviewUrl = getTelegramQrUrl(client.id, 360);
-
-                  return (
+                filteredClients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50 align-top">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <span className="font-medium text-gray-900">{client.fullName}</span>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center min-w-0">
+                        <span className="font-medium text-gray-900 truncate">{client.fullName}</span>
                         {client.vip && <Star className="w-4 h-4 ml-2 text-yellow-500 fill-current" />}
                         {client.telegramChatId && (
-                          <MessageCircle className="w-4 h-4 ml-2 text-blue-500" aria-label="Telegram подключен" />
+                          <MessageCircle className="w-4 h-4 ml-2 text-blue-500 shrink-0" aria-label="Telegram подключен" />
                         )}
                       </div>
                     </td>
                     {isAdmin && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {client.user ? getUserLabel(client.user as AppUser) : '—'}
+                      <td className="px-4 py-4 text-sm text-gray-600">
+                        <div className="truncate">
+                          {client.user ? getUserLabel(client.user as AppUser) : '—'}
+                        </div>
                       </td>
                     )}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {client.email || '—'}
+                    <td className="px-4 py-4 text-sm text-gray-600">
+                      <div className="space-y-1">
+                        <div className="truncate">{client.email || 'Email не указан'}</div>
+                        <div className="truncate">{client.phone || 'Телефон не указан'}</div>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                      {client.address || '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {client.phone || '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4">
                       <span className={`px-2 py-1 text-xs rounded-full ${
                         client.vip ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
                       }`}>
                         {client.vip ? 'VIP' : 'Обычный'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 min-w-[260px]">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center px-2 py-1 text-xs rounded-full font-medium ${
-                              client.telegramChatId
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-gray-100 text-gray-700'
-                            }`}>
-                              <MessageCircle className="w-3 h-3 mr-1" />
-                              {client.telegramChatId ? 'Подключено' : 'Не подключено'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={fetchClients}
-                              className="inline-flex items-center text-xs text-gray-500 hover:text-gray-800"
-                              title="Обновить статус"
-                            >
-                              <RefreshCw className="w-3 h-3 mr-1" />
-                              Проверить
-                            </button>
-                          </div>
-
-                          {telegramConnectUrl ? (
-                            <button
-                              type="button"
-                              onClick={() => copyTelegramLink(client.id)}
-                              className="mt-2 inline-flex items-center text-sm font-medium text-sky-700 hover:text-sky-900"
-                              title="Скопировать ссылку подключения клиента"
-                            >
-                              {copiedClientId === client.id ? (
-                                <>
-                                  <Check className="w-4 h-4 mr-1" />
-                                  Скопировано
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-4 h-4 mr-1" />
-                                  Скопировать ссылку
-                                </>
-                              )}
-                            </button>
-                          ) : (
-                            <div className="mt-2 text-xs text-amber-700">
-                              {botInfo?.message || (botInfo?.configured
-                                ? 'Username бота не получен'
-                                : 'TELEGRAM_BOT_TOKEN не задан')}
-                            </div>
-                          )}
-                        </div>
-
-                        {telegramQrUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (telegramQrPreviewUrl && telegramConnectUrl) {
-                                setQrPreview({
-                                  clientName: client.fullName,
-                                  url: telegramQrPreviewUrl,
-                                  connectUrl: telegramConnectUrl,
-                                });
-                              }
-                            }}
-                            className="border border-gray-200 rounded bg-white p-1 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            title="Открыть QR-код крупно"
-                          >
-                            <img
-                              src={telegramQrUrl}
-                              alt={`QR-код подключения Telegram для клиента ${client.fullName}`}
-                              className="w-20 h-20"
-                            />
-                          </button>
-                        ) : (
-                          <div className="w-20 h-20 border border-dashed border-gray-300 rounded flex flex-col items-center justify-center text-gray-400 shrink-0">
-                            <QrCode className="w-5 h-5 mb-1" />
-                            <span className="text-[10px]">QR</span>
-                          </div>
-                        )}
-                      </div>
+                    <td className="px-4 py-4 text-sm text-gray-600">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                        client.telegramChatId
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        <MessageCircle className="w-3 h-3 mr-1" />
+                        {client.telegramChatId ? 'Подключено' : 'Не подключено'}
+                      </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {new Date(client.createdAt).toLocaleDateString('ru-RU')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link
-                        to={`/clients/${client.id}`}
-                        className="text-blue-600 hover:text-blue-900 mr-4"
-                      >
-                        <Edit className="w-5 h-5 inline" />
-                      </Link>
+                    <td className="px-4 py-4 text-center text-sm font-medium">
                       <button
-                        onClick={() => handleDelete(client.id)}
-                        className="text-red-600 hover:text-red-900"
+                        type="button"
+                        onClick={() => setSelectedClientProfile(client)}
+                        className="inline-flex min-w-[112px] items-center justify-center px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium"
                       >
-                        <Trash2 className="w-5 h-5 inline" />
+                        Подробнее
                       </button>
                     </td>
                   </tr>
-                )})
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {selectedClientProfile && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <span className="truncate">{selectedClientProfile.fullName}</span>
+                  {selectedClientProfile.vip && <Star className="w-5 h-5 text-yellow-500 fill-current shrink-0" />}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">Профиль клиента</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedClientProfile(null)}
+                className="p-1 text-gray-500 hover:text-gray-800"
+                title="Закрыть"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <div className="text-sm text-gray-500">Статус</div>
+                  <span className={`mt-1 inline-flex px-2.5 py-1 text-sm rounded-full ${
+                    selectedClientProfile.vip ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {selectedClientProfile.vip ? 'VIP' : 'Обычный'}
+                  </span>
+                </div>
+                {isAdmin && (
+                  <div>
+                    <div className="text-sm text-gray-500">Преподаватель</div>
+                    <div className="font-medium text-gray-900">
+                      {selectedClientProfile.user ? getUserLabel(selectedClientProfile.user as AppUser) : 'Не указан'}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-sm text-gray-500">Email</div>
+                  <div className="font-medium text-gray-900 break-words">{selectedClientProfile.email || 'Не указан'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Телефон</div>
+                  <div className="font-medium text-gray-900">{selectedClientProfile.phone || 'Не указан'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Адрес занятий</div>
+                  <div className="font-medium text-gray-900 break-words">{selectedClientProfile.address || 'Не указан'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Дата создания</div>
+                  <div className="font-medium text-gray-900">
+                    {new Date(selectedClientProfile.createdAt).toLocaleDateString('ru-RU')}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-semibold text-gray-900">Telegram</h3>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                    selectedClientProfile.telegramChatId
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    <MessageCircle className="w-3 h-3 mr-1" />
+                    {selectedClientProfile.telegramChatId ? 'Подключено' : 'Не подключено'}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-gray-600">
+                  Ссылка и QR-код нужны, чтобы клиент мог подключиться к боту для уведомлений о занятиях.
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={fetchClients}
+                    className="inline-flex items-center px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-white"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Проверить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => copyTelegramLink(selectedClientProfile.id)}
+                    disabled={!selectedClientTelegramConnectUrl}
+                    className="inline-flex items-center px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {copiedClientId === selectedClientProfile.id ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Скопировано
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Скопировать ссылку
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {selectedClientTelegramQrUrl && selectedClientTelegramConnectUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setQrPreview({
+                      clientName: selectedClientProfile.fullName,
+                      url: selectedClientTelegramQrUrl,
+                      connectUrl: selectedClientTelegramConnectUrl
+                    })}
+                    className="mt-4 inline-flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-3 hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <img
+                      src={selectedClientTelegramQrUrl}
+                      alt={`QR-код подключения Telegram для клиента ${selectedClientProfile.fullName}`}
+                      className="w-28 h-28"
+                    />
+                    <span className="text-sm font-medium text-blue-700 text-left">Открыть QR-код крупно</span>
+                  </button>
+                ) : (
+                  <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    {botInfo?.message || (botInfo?.configured ? 'Username бота не получен' : 'TELEGRAM_BOT_TOKEN не задан')}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t flex flex-col sm:flex-row gap-3 sm:justify-end">
+              <Link
+                to={`/clients/${selectedClientProfile.id}`}
+                className="inline-flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg border border-blue-200 text-blue-700 font-medium hover:bg-blue-50"
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Изменить
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  handleDelete(selectedClientProfile.id);
+                  setSelectedClientProfile(null);
+                }}
+                className="inline-flex items-center justify-center px-4 py-3 sm:py-2 rounded-lg border border-red-200 text-red-700 font-medium hover:bg-red-50"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {qrPreview && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-center justify-center p-4">

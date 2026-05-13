@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../utils/apiBase';
-import { Users, Shield, ShieldOff, Mail, Calendar } from 'lucide-react';
+import { Users, Shield, ShieldOff, Mail, Calendar, MessageCircle } from 'lucide-react';
 
 
 interface User {
@@ -9,6 +9,7 @@ interface User {
   email: string;
   fullName?: string;
   role: 'ADMIN' | 'TEACHER';
+  telegramChatId?: string | null;
   createdAt: string;
   clients?: Array<{
     id: number;
@@ -61,6 +62,19 @@ export default function AdminUsers() {
     }
   };
 
+  const getTelegramStatus = (user: User) => {
+    if (user.role === 'ADMIN') {
+      return {
+        label: 'Не требуется',
+        className: 'bg-gray-100 text-gray-700',
+      };
+    }
+
+    return user.telegramChatId
+      ? { label: 'Подключен', className: 'bg-emerald-100 text-emerald-800' }
+      : { label: 'Не подключен', className: 'bg-gray-100 text-gray-700' };
+  };
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 md:mb-8">
@@ -106,6 +120,10 @@ export default function AdminUsers() {
                         ) : (
                           'Преподаватель'
                         )}
+                      </span>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getTelegramStatus(user).className}`}>
+                        <MessageCircle className="w-3 h-3 mr-1" />
+                        Telegram: {getTelegramStatus(user).label}
                       </span>
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
                         {new Date(user.createdAt).toLocaleDateString('ru-RU')}
@@ -186,6 +204,9 @@ export default function AdminUsers() {
                     Клиенты
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Telegram
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Дата регистрации
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -264,6 +285,12 @@ export default function AdminUsers() {
                       ) : (
                         <span className="text-sm text-gray-400">—</span>
                       )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getTelegramStatus(user).className}`}>
+                        <MessageCircle className="w-3 h-3 mr-1" />
+                        {getTelegramStatus(user).label}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-sm text-gray-500">

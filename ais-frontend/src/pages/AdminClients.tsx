@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../utils/apiBase';
-import { Search, Users, Mail, Phone, Calendar, DollarSign, X } from 'lucide-react';
+import { Search, Users, Mail, Phone, Calendar, DollarSign, X, MessageCircle } from 'lucide-react';
 
 
 interface Client {
@@ -10,6 +10,7 @@ interface Client {
   email?: string;
   phone?: string;
   vip: boolean;
+  telegramChatId?: string | null;
   notes?: string;
   createdAt: string;
   user: {
@@ -122,6 +123,12 @@ export default function AdminClients() {
     }
   };
 
+  const getTelegramStatus = (client: Client) => {
+    return client.telegramChatId
+      ? { label: 'Подключен', className: 'bg-emerald-100 text-emerald-800' }
+      : { label: 'Не подключен', className: 'bg-gray-100 text-gray-700' };
+  };
+
   const totalPayments = selectedClient?.payments.reduce(
     (sum, p) => sum + parseFloat(p.amount),
     0
@@ -178,6 +185,10 @@ export default function AdminClients() {
                       }`}>
                         {client.vip ? 'VIP клиент' : 'Активен'}
                       </span>
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getTelegramStatus(client).className}`}>
+                        <MessageCircle className="w-3 h-3 mr-1" />
+                        Telegram: {getTelegramStatus(client).label}
+                      </span>
                     </div>
 
                     <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-700">
@@ -233,6 +244,9 @@ export default function AdminClients() {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Статус
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Telegram
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Занятия
@@ -294,6 +308,12 @@ export default function AdminClients() {
                         client.vip ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
                       }`}>
                         {client.vip ? 'VIP клиент' : 'Активен'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getTelegramStatus(client).className}`}>
+                        <MessageCircle className="w-3 h-3 mr-1" />
+                        {getTelegramStatus(client).label}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -367,6 +387,13 @@ export default function AdminClients() {
                     <p className="text-sm text-gray-600">Преподаватель</p>
                     <p className="font-medium">{selectedClient.user.fullName}</p>
                     <p className="text-sm text-gray-500">{selectedClient.user.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Telegram</p>
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getTelegramStatus(selectedClient).className}`}>
+                      <MessageCircle className="w-3 h-3 mr-1" />
+                      {getTelegramStatus(selectedClient).label}
+                    </span>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Дата регистрации</p>
