@@ -43,6 +43,22 @@ describe('Slot Weights API', () => {
     expect(res.body.desiredBreakMinutes).toBe(45);
   });
 
+  it('PUT /api/slot-weights/:userId отклоняет нулевую сумму весов ранжирования', async () => {
+    const res = await request(app)
+      .put(`/api/slot-weights/${seed.teacher.id}`)
+      .set(authHeader(seed.teacher))
+      .send({
+        wTime: 0,
+        wCompact: 0,
+        wWorkingDay: 0,
+        wPriority: 0,
+        wTravel: 0,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('больше 0');
+  });
+
   it('GET /api/slot-weights возвращает все веса только администратору', async () => {
     const teacherRes = await request(app)
       .get('/api/slot-weights')

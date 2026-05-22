@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prismaClient';
+import { logAuditAction } from '../services/auditLogService';
 
 const ACTIVE_REQUEST_STATUSES = ['PENDING', 'NEW', 'ACTIVE', 'CONFIRMED', 'ACCEPTED'];
 const VALID_REQUEST_STATUSES = [...ACTIVE_REQUEST_STATUSES, 'REJECTED', 'CANCELLED'];
@@ -20,6 +21,21 @@ function normalizeSlots(proposedSlots: any, fallbackStatus = 'PENDING') {
   return Array.isArray(proposedSlots)
     ? proposedSlots.map(slot => normalizeSlot(slot, fallbackStatus))
     : proposedSlots;
+}
+
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function isPastCalendarDay(date: Date) {
+  return startOfLocalDay(date).getTime() < startOfLocalDay(new Date()).getTime();
+}
+
+function hasPastSlot(proposedSlots: any) {
+  return Array.isArray(proposedSlots) && proposedSlots.some((slot) => {
+    const from = new Date(slot?.from);
+    return !Number.isNaN(from.getTime()) && isPastCalendarDay(from);
+  });
 }
 
 function setSlotsStatus(proposedSlots: any, status: string) {
@@ -263,6 +279,13 @@ export async function create(req: Request, res: Response) {
       status = 'PENDING';
     }
 
+    if (hasPastSlot(proposedSlots)) {
+      return res.status(400).json({
+        error: 'Past slots are not allowed',
+        message: 'Запросы слотов нельзя создавать на прошедшие даты. Задним числом занятие можно добавить только в календаре как проведенное.',
+      });
+    }
+
     const created = await prisma.slotRequest.create({
       data: {
         clientId: clientId,
@@ -282,6 +305,19 @@ export async function create(req: Request, res: Response) {
     });
 
     console.log(`✅ Запрос слота создан с ID: ${created.id} для клиента ${client.fullName}`);
+
+    await logAuditAction({
+      userId: created.userId,
+      action: 'slotRequest.create',
+      entity: 'SlotRequest',
+      entityId: created.id,
+      details: {
+        clientId: created.clientId,
+        clientName: created.client.fullName,
+        slotsCount: Array.isArray(created.proposedSlots) ? created.proposedSlots.length : 0,
+        createdBy: userId,
+      },
+    });
     
     res.status(201).json(created);
   } catch (err: any) {
@@ -389,6 +425,21 @@ export async function update(req: Request, res: Response) {
     }
     
     console.log(`✅ Запрос слота ${id} обновлен`);
+
+    await logAuditAction({
+      userId: updated.userId,
+      action: existingRequest.status !== 'CANCELLED' && updated.status === 'CANCELLED'
+        ? 'slotRequest.cancel'
+        : 'slotRequest.update',
+      entity: 'SlotRequest',
+      entityId: updated.id,
+      details: {
+        clientId: updated.clientId,
+        oldStatus: existingRequest.status,
+        newStatus: updated.status,
+        changedBy: userId,
+      },
+    });
     
     res.json(updated);
   } catch (err: any) {
@@ -448,6 +499,20 @@ export async function remove(req: Request, res: Response) {
     });
     
     console.log(`✅ Запрос слота ${id} отменен пользователем ${userId}`);
+
+    await logAuditAction({
+      userId: updated.userId,
+      action: 'slotRequest.cancel',
+      entity: 'SlotRequest',
+      entityId: updated.id,
+      details: {
+        clientId: updated.clientId,
+        clientName: updated.client.fullName,
+        oldStatus: existing.status,
+        newStatus: updated.status,
+        changedBy: userId,
+      },
+    });
     
     res.json({ message: 'Запрос отменен', request: updated });
   } catch (err: any) {
@@ -490,6 +555,20 @@ export async function restore(req: Request, res: Response) {
           }
         }
       }
+    });
+
+    await logAuditAction({
+      userId: updated.userId,
+      action: 'slotRequest.restore',
+      entity: 'SlotRequest',
+      entityId: updated.id,
+      details: {
+        clientId: updated.clientId,
+        clientName: updated.client.fullName,
+        oldStatus: existing.status,
+        newStatus: updated.status,
+        changedBy: req.userId,
+      },
     });
 
     res.json({ message: 'Запрос восстановлен', request: updated });
@@ -540,6 +619,13 @@ export async function acceptSlot(req: Request, res: Response) {
       return res.status(400).json({ error: 'Нельзя принять отмененный слот' });
     }
 
+    if (hasPastSlot([normalizedSelectedSlot])) {
+      return res.status(400).json({
+        error: 'Past slot cannot be accepted',
+        message: 'Нельзя принять слот за прошедшую дату. Задним числом занятие можно добавить только в календаре как проведенное.',
+      });
+    }
+
     const updatedSlots = slots.map((slot, idx) => (
       idx === slotIndex
         ? { ...normalizeSlot(slot), status: 'CONFIRMED' }
@@ -547,7 +633,7 @@ export async function acceptSlot(req: Request, res: Response) {
     ));
 
     // Помечаем запрос как принятый
-    await prisma.slotRequest.update({
+    const updatedRequest = await prisma.slotRequest.update({
       where: { id: requestId },
       data: {
         status: 'CONFIRMED',
@@ -556,6 +642,20 @@ export async function acceptSlot(req: Request, res: Response) {
     });
 
     console.log(`✅ Слот ${slotIndex} из запроса ${requestId} принят`);
+
+    await logAuditAction({
+      userId: request.userId,
+      action: 'slotRequest.acceptSlot',
+      entity: 'SlotRequest',
+      entityId: request.id,
+      details: {
+        clientId: request.clientId,
+        clientName: request.client.fullName,
+        slotIndex,
+        newStatus: updatedRequest.status,
+        changedBy: userId,
+      },
+    });
 
     res.json({ 
       message: 'Слот принят',
@@ -615,10 +715,23 @@ export async function rejectSlot(req: Request, res: Response) {
         status: updated.status,
         proposedSlots: updated.proposedSlots,
       });
+
+      await logAuditAction({
+        userId: request.userId,
+        action: 'slotRequest.rejectSlot',
+        entity: 'SlotRequest',
+        entityId: request.id,
+        details: {
+          clientId: request.clientId,
+          slotIndex,
+          newStatus: updated.status,
+          changedBy: userId,
+        },
+      });
     } else {
       const cancelledSlots = setSlotsStatus(request.proposedSlots, 'CANCELLED');
       // Отклоняем весь запрос
-      await prisma.slotRequest.update({
+      const updated = await prisma.slotRequest.update({
         where: { id: requestId },
         data: {
           status: 'CANCELLED',
@@ -631,6 +744,19 @@ export async function rejectSlot(req: Request, res: Response) {
         clientId: request.clientId,
         status: 'CANCELLED',
         proposedSlots: cancelledSlots,
+      });
+
+      await logAuditAction({
+        userId: request.userId,
+        action: 'slotRequest.cancel',
+        entity: 'SlotRequest',
+        entityId: request.id,
+        details: {
+          clientId: request.clientId,
+          oldStatus: request.status,
+          newStatus: updated.status,
+          changedBy: userId,
+        },
       });
     }
 
@@ -698,6 +824,20 @@ export async function restoreSlot(req: Request, res: Response) {
           }
         }
       }
+    });
+
+    await logAuditAction({
+      userId: updated.userId,
+      action: 'slotRequest.restoreSlot',
+      entity: 'SlotRequest',
+      entityId: updated.id,
+      details: {
+        clientId: updated.clientId,
+        clientName: updated.client.fullName,
+        slotIndex,
+        newStatus: updated.status,
+        changedBy: userId,
+      },
     });
 
     res.json({ message: 'Слот восстановлен', request: updated });
@@ -789,6 +929,20 @@ export async function cancelSlotSelection(req: Request, res: Response) {
           }
         }
       });
+    });
+
+    await logAuditAction({
+      userId: updated.userId,
+      action: 'slotRequest.cancelSelection',
+      entity: 'SlotRequest',
+      entityId: updated.id,
+      details: {
+        clientId: updated.clientId,
+        clientName: updated.client.fullName,
+        slotIndex,
+        cancelledLessonId: selectedLesson?.id ?? null,
+        changedBy: userId,
+      },
     });
 
     res.json({

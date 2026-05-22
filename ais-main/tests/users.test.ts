@@ -59,4 +59,33 @@ describe('Users API', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/цифру|заглавную|простых шаблонов/i);
   });
+
+  it('PUT /api/users/:id не дает администратору забрать права у самого себя', async () => {
+    const res = await request(app)
+      .put(`/api/users/${seed.admin.id}`)
+      .set(authHeader(seed.admin))
+      .send({ role: 'TEACHER' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('собственную роль');
+
+    const admin = await testPrisma.user.findUnique({
+      where: { id: seed.admin.id },
+      select: { role: true },
+    });
+    expect(admin?.role).toBe('ADMIN');
+  });
+
+  it('GET /api/users учитывает актуальную роль из базы, а не роль в старом токене', async () => {
+    await testPrisma.user.update({
+      where: { id: seed.admin.id },
+      data: { role: 'TEACHER' },
+    });
+
+    const res = await request(app)
+      .get('/api/users')
+      .set(authHeader(seed.admin));
+
+    expect(res.status).toBe(403);
+  });
 });

@@ -228,6 +228,12 @@ function calculateWorkingDayScore(date: Date, workingDays: number[]): number {
   return workingDays.includes(date.getDay()) ? 1 : 0.25;
 }
 
+function isSameCalendarDay(left: Date, right: Date): boolean {
+  return left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate();
+}
+
 function findAdjacentLessons(
   slotStart: Date,
   slotEnd: Date,
@@ -237,6 +243,8 @@ function findAdjacentLessons(
   let next: LessonForRanking | null = null;
 
   for (const lesson of lessons) {
+    if (!isSameCalendarDay(slotStart, lesson.startTime)) continue;
+
     const lessonEnd = getLessonEnd(lesson);
 
     if (lessonEnd <= slotStart) {
@@ -441,7 +449,7 @@ async function calculateTravelDetails(
       travelTimeMinutes: null,
       availableGapMinutes: null,
       desiredBreakMinutes,
-      explanation: 'Нет соседних занятий, дорога не ограничивает слот',
+      explanation: 'Единственное занятие в этот день: дорога между занятиями не ограничивает слот',
     };
   }
 
@@ -517,9 +525,7 @@ function buildCriterionReasons(
     compact: getCompactReason(breakdown.compactScore),
     workingDay: getWorkingDayReason(breakdown.workingDayScore),
     priority: isVip ? 'Клиент отмечен как VIP.' : undefined,
-    travel: travelDetails.travelTimeMinutes === null
-      ? undefined
-      : `${travelDetails.explanation}.`,
+    travel: `${travelDetails.explanation}.`,
   };
 }
 

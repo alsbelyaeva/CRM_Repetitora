@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import prisma from '../utils/prismaClient';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-change-me';
 
@@ -21,7 +22,7 @@ declare global {
   }
 }
 
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
+export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers.authorization;
 
@@ -48,12 +49,30 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
       });
     }
 
-    req.userId = userId;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!user || user.deletedAt) {
+      return res.status(401).json({
+        error: 'Пользователь не найден',
+        details: 'Пользователь был удален или больше не имеет доступа',
+      });
+    }
+
+    req.userId = user.id;
     req.user = {
-      id: userId,
-      email: decoded.email || '',
-      role: decoded.role || 'TEACHER',
-      fullName: decoded.fullName,
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      fullName: user.fullName || undefined,
     };
 
     next();

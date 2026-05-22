@@ -22,7 +22,7 @@ describe('Lessons API', () => {
       .set(authHeader(seed.teacher))
       .send({
         clientId: seed.secondClient.id,
-        startTime: '2026-05-13T10:00:00+03:00',
+        startTime: '2026-06-13T10:00:00+03:00',
         durationMin: 60,
         type: 'INDIVIDUAL',
       });
@@ -30,6 +30,36 @@ describe('Lessons API', () => {
     expect(res.status).toBe(201);
     expect(res.body.clientId).toBe(seed.secondClient.id);
     expect(res.body.status).toBe('PLANNED');
+  });
+
+  it('POST /api/lessons создает групповое занятие с несколькими участниками', async () => {
+    const res = await request(app)
+      .post('/api/lessons')
+      .set(authHeader(seed.teacher))
+      .send({
+        clientId: seed.client.id,
+        participantClientIds: [seed.client.id, seed.secondClient.id],
+        startTime: '2026-06-13T11:30:00+03:00',
+        durationMin: 60,
+        type: 'Групповое',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.clientId).toBe(seed.client.id);
+    expect(res.body.participants).toHaveLength(2);
+    expect(res.body.participants.map((participant: any) => participant.client.id).sort()).toEqual([
+      seed.client.id,
+      seed.secondClient.id,
+    ].sort());
+
+    const participants = await testPrisma.lessonParticipant.findMany({
+      where: { lessonId: res.body.id },
+      orderBy: { clientId: 'asc' },
+    });
+    expect(participants.map((participant) => participant.clientId)).toEqual([
+      seed.client.id,
+      seed.secondClient.id,
+    ].sort((a, b) => a - b));
   });
 
   it('DELETE /api/lessons/:id отменяет занятие без удаления записи', async () => {
@@ -66,7 +96,7 @@ describe('Lessons API', () => {
         weekday: 4,
         startTime: '09:00',
         durationMin: 60,
-        startDate: '2026-05-07',
+        startDate: '2026-06-04',
         repeatCount: 3,
         type: 'INDIVIDUAL',
         notes: 'Регулярная серия',
@@ -92,7 +122,7 @@ describe('Lessons API', () => {
       .set(authHeader(seed.teacher))
       .send({
         clientId: otherClient.id,
-        startTime: '2026-05-13T12:00:00+03:00',
+        startTime: '2026-06-13T12:00:00+03:00',
         durationMin: 60,
         type: 'INDIVIDUAL',
       });

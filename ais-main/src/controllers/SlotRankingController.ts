@@ -10,6 +10,14 @@ const DEFAULT_PREFERRED_TIMES = {
 
 const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
 
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function isPastCalendarDay(date: Date) {
+  return startOfLocalDay(date).getTime() < startOfLocalDay(new Date()).getTime();
+}
+
 function validateProposedSlots(slots: any[]): string | null {
   for (const slot of slots) {
     if (!slot?.from || !slot?.to) {
@@ -25,6 +33,10 @@ function validateProposedSlots(slots: any[]): string | null {
 
     if (to <= from) {
       return 'Время окончания слота должно быть позже времени начала';
+    }
+
+    if (isPastCalendarDay(from)) {
+      return 'Запросы слотов нельзя создавать на прошедшие даты. Задним числом занятие можно добавить только в календаре как проведенное.';
     }
   }
 
@@ -283,6 +295,13 @@ export async function selectAndCreateLesson(req: Request, res: Response) {
     const startTime = new Date(selectedSlot.from);
     const endTime = new Date(startTime.getTime() + Number(durationMin) * 60 * 1000);
 
+    if (isPastCalendarDay(startTime)) {
+      return res.status(400).json({
+        error: 'Past slot cannot be accepted',
+        message: 'Нельзя подтвердить запрос слота за прошедшую дату. Задним числом занятие можно добавить только в календаре как проведенное.',
+      });
+    }
+
     const [currentLessons, currentEvents] = await Promise.all([
       prisma.lesson.findMany({
         where: {
@@ -332,12 +351,25 @@ export async function selectAndCreateLesson(req: Request, res: Response) {
         type,
         status: 'PLANNED',
         notes,
+        participants: {
+          create: [{ clientId: Number(clientId) }],
+        },
       },
       include: {
         client: {
           select: {
             id: true,
             fullName: true,
+          },
+        },
+        participants: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                fullName: true,
+              },
+            },
           },
         },
       },
@@ -404,6 +436,13 @@ export async function replaceConflictingLesson(req: Request, res: Response) {
 
     const startTime = new Date(selectedSlot.from);
 
+    if (isPastCalendarDay(startTime)) {
+      return res.status(400).json({
+        error: 'Past slot cannot be accepted',
+        message: 'Нельзя заменить занятие запросом слота за прошедшую дату. Задним числом занятие можно добавить только в календаре как проведенное.',
+      });
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       await tx.lesson.update({
         where: { id: Number(conflictingLessonId) },
@@ -449,12 +488,25 @@ export async function replaceConflictingLesson(req: Request, res: Response) {
           type,
           status: 'PLANNED',
           notes,
+          participants: {
+            create: [{ clientId: Number(clientId) }],
+          },
         },
         include: {
           client: {
             select: {
               id: true,
               fullName: true,
+            },
+          },
+          participants: {
+            include: {
+              client: {
+                select: {
+                  id: true,
+                  fullName: true,
+                },
+              },
             },
           },
         },

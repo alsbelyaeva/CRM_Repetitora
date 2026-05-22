@@ -2,9 +2,17 @@ import { Router } from 'express';
 import * as ctrl from '../controllers/lessonsController';
 import { authMiddleware } from '../middleware/auth';
 import { PrismaClient } from '@prisma/client';
+import { logAuditAction } from '../services/auditLogService';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+function getLessonStatusAuditAction(oldStatus: string | null | undefined, newStatus: string) {
+  if (newStatus === 'CANCELLED') return 'lesson.cancel';
+  if (oldStatus === 'CANCELLED' && newStatus === 'PLANNED') return 'lesson.restore';
+  if (oldStatus && oldStatus !== newStatus) return 'lesson.status.update';
+  return 'lesson.update';
+}
 
 function normalizeSlot(slot: any, fallbackStatus = 'PENDING') {
   if (!slot || typeof slot !== 'object') return slot;
@@ -76,6 +84,10 @@ function startOfLocalDay(date: Date) {
 
 function isFutureCalendarDay(date: Date) {
   return startOfLocalDay(date).getTime() > startOfLocalDay(new Date()).getTime();
+}
+
+function isPastCalendarDay(date: Date) {
+  return startOfLocalDay(date).getTime() < startOfLocalDay(new Date()).getTime();
 }
 
 function lessonsOverlap(
@@ -164,6 +176,88 @@ function describeBusyConflictMessage(conflict: any, prefix = 'Это время 
   return `${prefix} с занятием клиента ${conflict?.client?.fullName || 'другого клиента'}`;
 }
 
+function normalizeParticipantClientIds(clientId: unknown, participantClientIds: unknown) {
+  const ids = Array.isArray(participantClientIds)
+    ? participantClientIds
+    : participantClientIds !== undefined && participantClientIds !== null
+      ? [participantClientIds]
+      : [];
+
+  const normalized = ids
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0);
+  const primaryId = Number(clientId);
+
+  if (Number.isInteger(primaryId) && primaryId > 0) {
+    normalized.unshift(primaryId);
+  }
+
+  return Array.from(new Set(normalized));
+}
+
+async function validateLessonParticipants(options: {
+  user: any;
+  clientId: number;
+  participantClientIds?: unknown;
+  assignedTeacherId?: string;
+  expectedUserId?: string | null;
+}) {
+  const participantIds = normalizeParticipantClientIds(options.clientId, options.participantClientIds);
+  if (participantIds.length === 0) {
+    return { error: 'Не выбран клиент занятия' };
+  }
+
+  const clients = await prisma.client.findMany({
+    where: {
+      id: { in: participantIds },
+      ...(options.user.role === 'ADMIN'
+        ? options.assignedTeacherId
+          ? { userId: options.assignedTeacherId }
+          : options.expectedUserId
+            ? { userId: options.expectedUserId }
+            : {}
+        : { userId: options.user.id }),
+    },
+    select: {
+      id: true,
+      fullName: true,
+      userId: true,
+    },
+  });
+
+  if (clients.length !== participantIds.length) {
+    return { error: 'Один или несколько клиентов не найдены или недоступны' };
+  }
+
+  const ownerIds = Array.from(new Set(clients.map(client => client.userId)));
+  if (ownerIds.length !== 1) {
+    return { error: 'Все участники группового занятия должны относиться к одному преподавателю' };
+  }
+
+  return {
+    participantIds,
+    clients,
+    targetUserId: options.user.role === 'ADMIN' ? ownerIds[0] : options.user.id,
+  };
+}
+
+const lessonParticipantsInclude = {
+  participants: {
+    include: {
+      client: {
+        select: {
+          id: true,
+          fullName: true,
+          address: true,
+        },
+      },
+    },
+    orderBy: {
+      id: 'asc' as const,
+    },
+  },
+};
+
 function formatConflictDateTime(conflict: any) {
   const occurrence = new Date(conflict.occurrence);
   return `${occurrence.toLocaleDateString('ru-RU')} ${conflict.time || formatTimeValue(occurrence)}`;
@@ -242,8 +336,10 @@ async function getLessonAccess(id: number, user: any) {
         select: {
           id: true,
           fullName: true,
+          address: true,
         },
       },
+      ...lessonParticipantsInclude,
     },
   });
 }
@@ -437,6 +533,7 @@ router.get('/', async (req, res) => {
           select: {
             id: true,
             fullName: true,
+            address: true,
             user: {
               select: {
                 id: true,
@@ -446,6 +543,7 @@ router.get('/', async (req, res) => {
             }
           },
         },
+        ...lessonParticipantsInclude,
         user: {
           select: {
             id: true,
@@ -490,9 +588,12 @@ router.get('/api/lessons', async (req, res) => {
       include: {
         client: {
           select: {
+            id: true,
             fullName: true,
+            address: true,
           },
         },
+        ...lessonParticipantsInclude,
       },
       orderBy: {
         startTime: 'asc',
@@ -579,8 +680,10 @@ router.get('/:id', async (req, res) => {
           select: {
             id: true,
             fullName: true,
+            address: true,
           },
         },
+        ...lessonParticipantsInclude,
       },
     });
 
@@ -602,7 +705,7 @@ router.get('/:id', async (req, res) => {
 // Создать занятие
 router.post('/', async (req, res) => {
   try {
-    const { clientId, startTime, durationMin, type, status, notes, userId: assignedTeacherId } = req.body;
+    const { clientId, participantClientIds, startTime, durationMin, type, status, notes, userId: assignedTeacherId } = req.body;
     const user = req.user;
 
     if (!user) {
@@ -623,21 +726,21 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Проверка существования клиента
-    const client = await prisma.client.findFirst({
-      where: user.role === 'ADMIN'
-        ? { id: clientId, ...(assignedTeacherId ? { userId: assignedTeacherId } : {}) }
-        : { id: clientId, userId: user.id },
+    const participantValidation = await validateLessonParticipants({
+      user,
+      clientId: Number(clientId),
+      participantClientIds,
+      assignedTeacherId,
     });
 
-    if (!client) {
+    if ('error' in participantValidation) {
       return res.status(404).json({
         error: 'Client not found',
-        message: 'Клиент не найден или у вас нет доступа к нему',
+        message: participantValidation.error,
       });
     }
 
-    const targetUserId = user.role === 'ADMIN' ? client.userId : user.id;
+    const { participantIds, clients: lessonClients, targetUserId } = participantValidation;
     const normalizedStartTime = new Date(startTime);
     const normalizedDuration = Number(durationMin);
 
@@ -648,7 +751,11 @@ router.post('/', async (req, res) => {
       });
     }
 
-    if ((status || 'PLANNED') === 'PLANNED') {
+    const nextStatus = isPastCalendarDay(normalizedStartTime) && (status || 'PLANNED') === 'PLANNED'
+      ? 'DONE'
+      : (status || 'PLANNED');
+
+    if (nextStatus === 'PLANNED') {
       const conflict = await findPlannedLessonConflict(targetUserId, normalizedStartTime, normalizedDuration);
       if (conflict) {
         return res.status(409).json({
@@ -666,25 +773,51 @@ router.post('/', async (req, res) => {
     // Создание занятия (автоматически привязываем к текущему пользователю)
     const lesson = await prisma.lesson.create({
       data: {
-        clientId,
+        clientId: Number(clientId),
         startTime: normalizedStartTime,
         durationMin: normalizedDuration,
         type,
-        status: status || 'PLANNED',
+        status: nextStatus,
         notes: notes || null,
         userId: targetUserId,
+        participants: {
+          create: participantIds.map((participantClientId) => ({
+            clientId: participantClientId,
+          })),
+        },
       },
       include: {
         client: {
           select: {
             id: true,
             fullName: true,
+            address: true,
           },
         },
+        ...lessonParticipantsInclude,
       },
     });
 
     console.log('✅ [Lessons] Занятие создано:', lesson.id);
+
+    await logAuditAction({
+      userId: lesson.userId,
+      action: 'lesson.create',
+      entity: 'Lesson',
+      entityId: lesson.id,
+      details: {
+        clientId: lesson.clientId,
+        clientName: lesson.client?.fullName,
+        participantClientIds: participantIds,
+        participantNames: lessonClients.map(client => client.fullName),
+        startTime: lesson.startTime,
+        durationMin: lesson.durationMin,
+        status: lesson.status,
+        type: lesson.type,
+        createdBy: user.id,
+      },
+    });
+
     res.status(201).json(lesson);
   } catch (error) {
     console.error('❌ [Lessons] Error creating lesson:', error);
@@ -699,6 +832,7 @@ router.post('/recurring-series', async (req, res) => {
   try {
     const {
       clientId,
+      participantClientIds,
       weekday,
       startTime,
       durationMin,
@@ -750,20 +884,21 @@ router.post('/recurring-series', async (req, res) => {
       });
     }
 
-    const client = await prisma.client.findFirst({
-      where: user.role === 'ADMIN'
-        ? { id: Number(clientId), ...(assignedTeacherId ? { userId: assignedTeacherId } : {}) }
-        : { id: Number(clientId), userId: user.id },
+    const participantValidation = await validateLessonParticipants({
+      user,
+      clientId: Number(clientId),
+      participantClientIds,
+      assignedTeacherId,
     });
 
-    if (!client) {
+    if ('error' in participantValidation) {
       return res.status(404).json({
         error: 'Client not found',
-        message: 'Клиент не найден или у вас нет доступа к нему',
+        message: participantValidation.error,
       });
     }
 
-    const targetUserId = user.role === 'ADMIN' ? client.userId : user.id;
+    const { participantIds, targetUserId } = participantValidation;
     const occurrences = generateWeeklyOccurrences({
       startDate,
       endDate,
@@ -806,17 +941,24 @@ router.post('/recurring-series', async (req, res) => {
           startTime: occurrence,
           durationMin: normalizedDuration,
           type,
-          status: 'PLANNED',
+          status: isPastCalendarDay(occurrence) ? 'DONE' : 'PLANNED',
           notes: notes || null,
           recurringSeriesId: series.id,
+          participants: {
+            create: participantIds.map((participantClientId) => ({
+              clientId: participantClientId,
+            })),
+          },
         },
         include: {
           client: {
             select: {
               id: true,
               fullName: true,
+              address: true,
             },
           },
+          ...lessonParticipantsInclude,
         },
       }))
     );
@@ -832,6 +974,24 @@ router.post('/recurring-series', async (req, res) => {
       .slice(0, 5)
       .map(conflict => `${formatConflictDateTime(conflict)}: ${conflict.clientName || 'занято'}`)
       .join('; ');
+
+    await logAuditAction({
+      userId: targetUserId,
+      action: 'lesson.recurringSeries.create',
+      entity: 'RecurringSeries',
+      entityId: series.id,
+      details: {
+        clientId: Number(clientId),
+        participantClientIds: participantIds,
+        createdBy: user.id,
+        createdCount: lessons.length,
+        conflictCount: conflicts.length,
+        conflictSlotRequestId: conflictSlotRequest?.id ?? null,
+        weekday: normalizedWeekday,
+        startTime,
+        durationMin: normalizedDuration,
+      },
+    });
 
     return res.status(conflicts.length > 0 ? 207 : 201).json({
       series,
@@ -976,7 +1136,7 @@ router.post('/check-availability', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { clientId, startTime, durationMin, type, status, notes, scope = 'single' } = req.body;
+    const { clientId, participantClientIds, startTime, durationMin, type, status, notes, scope = 'single' } = req.body;
     const user = req.user;
 
     if (!user) {
@@ -1006,19 +1166,27 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    if (clientId !== undefined) {
-      const client = await prisma.client.findFirst({
-        where: user.role === 'ADMIN'
-          ? { id: clientId, ...(existingLesson.userId ? { userId: existingLesson.userId } : {}) }
-          : { id: clientId, userId: user.id },
+    const nextClientId = clientId !== undefined ? Number(clientId) : existingLesson.clientId;
+    let nextParticipantIds: number[] | undefined;
+    let nextParticipantNames: string[] | undefined;
+
+    if (clientId !== undefined || participantClientIds !== undefined) {
+      const validation = await validateLessonParticipants({
+        user,
+        clientId: nextClientId,
+        participantClientIds,
+        expectedUserId: existingLesson.userId,
       });
 
-      if (!client) {
+      if ('error' in validation) {
         return res.status(404).json({
           error: 'Client not found',
-          message: 'Клиент не найден или у вас нет доступа к нему',
+          message: validation.error,
         });
       }
+
+      nextParticipantIds = validation.participantIds;
+      nextParticipantNames = validation.clients.map(client => client.fullName);
     }
 
     if (existingLesson.recurringSeriesId && scope !== 'single') {
@@ -1035,7 +1203,6 @@ router.put('/:id', async (req, res) => {
       });
       const targetIds = targetLessons.map(lesson => lesson.id);
       const nextDurationMin = durationMin !== undefined ? Number(durationMin) : existingLesson.durationMin;
-      const nextStatus = status ?? existingLesson.status;
       const selectedLessonIndex = Math.max(
         targetLessons.findIndex(lesson => lesson.id === existingLesson.id),
         0
@@ -1052,6 +1219,14 @@ router.put('/:id', async (req, res) => {
         return res.status(400).json({
           error: 'Invalid lesson time',
           message: 'Некорректное время занятия',
+        });
+      }
+
+      const nextStatus = status ?? existingLesson.status;
+      if (nextStatus === 'PLANNED' && nextStarts.some(date => isPastCalendarDay(date))) {
+        return res.status(400).json({
+          error: 'Past lesson cannot be planned',
+          message: 'Занятия за прошедшие даты нельзя сохранять как запланированные. Они могут быть только проведенными или отмененными.',
         });
       }
 
@@ -1076,7 +1251,7 @@ router.put('/:id', async (req, res) => {
         prisma.lesson.update({
           where: { id: lesson.id },
           data: {
-            clientId,
+            clientId: clientId !== undefined ? nextClientId : undefined,
             startTime: nextStarts[index],
             durationMin: nextDurationMin,
             type,
@@ -1088,18 +1263,46 @@ router.put('/:id', async (req, res) => {
               select: {
                 id: true,
                 fullName: true,
+                address: true,
               },
             },
+            ...lessonParticipantsInclude,
           },
         })
       )));
+
+      if (nextParticipantIds) {
+        await prisma.$transaction(targetIds.flatMap((lessonId) => [
+          prisma.lessonParticipant.deleteMany({ where: { lessonId } }),
+          ...nextParticipantIds.map((participantClientId) => (
+            prisma.lessonParticipant.create({ data: { lessonId, clientId: participantClientId } })
+          )),
+        ]));
+      }
+
+      const refreshedLessons = nextParticipantIds
+        ? await prisma.lesson.findMany({
+            where: { id: { in: targetIds } },
+            orderBy: { startTime: 'asc' },
+            include: {
+              client: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  address: true,
+                },
+              },
+              ...lessonParticipantsInclude,
+            },
+          })
+        : updatedLessons;
 
       const firstUpdated = updatedLessons[0];
       if (firstUpdated) {
         await prisma.recurringSeries.update({
           where: { id: existingLesson.recurringSeriesId },
           data: {
-            clientId,
+            clientId: clientId !== undefined ? nextClientId : undefined,
             weekday: startTime !== undefined ? getIsoWeekday(firstUpdated.startTime) : undefined,
             startTime: startTime !== undefined ? formatTimeValue(firstUpdated.startTime) : undefined,
             durationMin: nextDurationMin,
@@ -1114,16 +1317,34 @@ router.put('/:id', async (req, res) => {
         await Promise.all(updatedLessons.map(cancelMatchingSlotRequestsForLesson));
       }
 
+      await logAuditAction({
+        userId: existingLesson.userId,
+        action: getLessonStatusAuditAction(existingLesson.status, nextStatus),
+        entity: 'RecurringSeries',
+        entityId: existingLesson.recurringSeriesId,
+        details: {
+          scope,
+          updatedCount: refreshedLessons.length,
+          participantClientIds: nextParticipantIds,
+          participantNames: nextParticipantNames,
+          oldStatus: existingLesson.status,
+          newStatus: nextStatus,
+          changedBy: user.id,
+        },
+      });
+
       return res.json({
         success: true,
-        updatedCount: updatedLessons.length,
-        lessons: updatedLessons,
+        updatedCount: refreshedLessons.length,
+        lessons: refreshedLessons,
       });
     }
 
     const nextStartTime = startTime !== undefined ? new Date(startTime) : existingLesson.startTime;
     const nextDurationMin = durationMin !== undefined ? Number(durationMin) : existingLesson.durationMin;
-    const nextStatus = status ?? existingLesson.status;
+    const nextStatus = isPastCalendarDay(nextStartTime) && (status ?? existingLesson.status) === 'PLANNED'
+      ? 'DONE'
+      : (status ?? existingLesson.status);
     const nextUserId = existingLesson.userId;
 
     if (nextStatus === 'PLANNED' && nextUserId) {
@@ -1145,29 +1366,76 @@ router.put('/:id', async (req, res) => {
     const lesson = await prisma.lesson.update({
       where: { id: parseInt(id) },
       data: {
-        clientId,
+        clientId: clientId !== undefined ? nextClientId : undefined,
         startTime: nextStartTime,
         durationMin: nextDurationMin,
         type,
         status: nextStatus,
-        notes: notes || null,
+        notes: notes === undefined ? undefined : notes || null,
       },
       include: {
         client: {
           select: {
             id: true,
             fullName: true,
+            address: true,
           },
         },
+        ...lessonParticipantsInclude,
       },
     });
+
+    let responseLesson = lesson;
+    if (nextParticipantIds) {
+      await prisma.$transaction([
+        prisma.lessonParticipant.deleteMany({ where: { lessonId: lesson.id } }),
+        ...nextParticipantIds.map((participantClientId) => (
+          prisma.lessonParticipant.create({ data: { lessonId: lesson.id, clientId: participantClientId } })
+        )),
+      ]);
+
+      const refreshedLesson = await prisma.lesson.findUnique({
+        where: { id: lesson.id },
+        include: {
+          client: {
+            select: {
+              id: true,
+              fullName: true,
+              address: true,
+            },
+          },
+          ...lessonParticipantsInclude,
+        },
+      });
+
+      if (refreshedLesson) {
+        responseLesson = refreshedLesson;
+      }
+    }
 
     if (lesson.status === 'CANCELLED') {
       await cancelMatchingSlotRequestsForLesson(lesson);
     }
 
     console.log('✅ [Lessons] Занятие обновлено');
-    res.json(lesson);
+
+    await logAuditAction({
+      userId: lesson.userId,
+      action: getLessonStatusAuditAction(existingLesson.status, lesson.status),
+      entity: 'Lesson',
+      entityId: responseLesson.id,
+      details: {
+        clientId: responseLesson.clientId,
+        clientName: responseLesson.client?.fullName,
+        participantClientIds: nextParticipantIds,
+        participantNames: nextParticipantNames,
+        oldStatus: existingLesson.status,
+        newStatus: responseLesson.status,
+        changedBy: user.id,
+      },
+    });
+
+    res.json(responseLesson);
   } catch (error) {
     console.error('❌ [Lessons] Error updating lesson:', error);
     res.status(500).json({
@@ -1229,6 +1497,13 @@ router.patch('/:id/status', async (req, res) => {
           message: 'Нельзя отметить проведенным занятие из будущей даты',
         });
       }
+    }
+
+    if (status === 'PLANNED' && isPastCalendarDay(existingLesson.startTime)) {
+      return res.status(400).json({
+        error: 'Past lesson cannot be planned',
+        message: 'Занятие за прошедшую дату нельзя вернуть в статус запланированного. Оно может быть только проведенным или отмененным.',
+      });
     }
 
     if (existingLesson.recurringSeriesId && scope !== 'single') {
@@ -1293,6 +1568,20 @@ router.patch('/:id/status', async (req, res) => {
         await Promise.all(targetLessons.map(cancelMatchingSlotRequestsForLesson));
       }
 
+      await logAuditAction({
+        userId: existingLesson.userId,
+        action: getLessonStatusAuditAction(existingLesson.status, status),
+        entity: 'RecurringSeries',
+        entityId: existingLesson.recurringSeriesId,
+        details: {
+          scope,
+          updatedCount: targetLessons.length,
+          oldStatus: existingLesson.status,
+          newStatus: status,
+          changedBy: user.id,
+        },
+      });
+
       return res.json({
         success: true,
         updatedCount: targetLessons.length,
@@ -1343,6 +1632,21 @@ router.patch('/:id/status', async (req, res) => {
     }
 
     console.log('✅ [Lessons] Статус изменен');
+
+    await logAuditAction({
+      userId: lesson.userId,
+      action: getLessonStatusAuditAction(existingLesson.status, lesson.status),
+      entity: 'Lesson',
+      entityId: lesson.id,
+      details: {
+        clientId: lesson.clientId,
+        clientName: lesson.client?.fullName,
+        oldStatus: existingLesson.status,
+        newStatus: lesson.status,
+        changedBy: user.id,
+      },
+    });
+
     res.json(lesson);
   } catch (error) {
     console.error('❌ [Lessons] Error updating lesson status:', error);
@@ -1420,6 +1724,20 @@ router.delete('/:id', async (req, res) => {
 
       await Promise.all(targetLessons.map(cancelMatchingSlotRequestsForLesson));
 
+      await logAuditAction({
+        userId: existingLesson.userId,
+        action: 'lesson.cancel',
+        entity: 'RecurringSeries',
+        entityId: existingLesson.recurringSeriesId,
+        details: {
+          scope,
+          updatedCount: targetLessons.length,
+          oldStatus: existingLesson.status,
+          newStatus: 'CANCELLED',
+          changedBy: user.id,
+        },
+      });
+
       return res.json({
         success: true,
         message: 'Регулярные занятия отменены',
@@ -1446,6 +1764,21 @@ router.delete('/:id', async (req, res) => {
     await cancelMatchingSlotRequestsForLesson(lesson);
 
     console.log('✅ [Lessons] Занятие отменено');
+
+    await logAuditAction({
+      userId: lesson.userId,
+      action: 'lesson.cancel',
+      entity: 'Lesson',
+      entityId: lesson.id,
+      details: {
+        clientId: lesson.clientId,
+        clientName: lesson.client?.fullName,
+        oldStatus: existingLesson.status,
+        newStatus: lesson.status,
+        changedBy: user.id,
+      },
+    });
+
     res.json({
       success: true,
       message: 'Занятие отменено',

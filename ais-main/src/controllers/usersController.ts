@@ -209,6 +209,18 @@ export const update = async (req: Request, res: Response) => {
     if (!targetUser) {
       return res.status(404).json({ error: 'Пользователь не найден' });
     }
+
+    if (
+      role !== undefined &&
+      currentUserRole === 'ADMIN' &&
+      currentUserId === targetUserId &&
+      role !== targetUser.role
+    ) {
+      return res.status(400).json({
+        error: 'Нельзя изменить собственную роль администратора',
+        details: 'Попросите другого администратора изменить права или создайте второго администратора заранее',
+      });
+    }
     
     const updateData: any = {};
     

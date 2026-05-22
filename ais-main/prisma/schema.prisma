@@ -44,6 +44,7 @@ model Client {
   userId       String        @map("user_id")
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   lessons      Lesson[]
+  lessonParticipants LessonParticipant[]
   payments     Payment[]
   recurringSeries RecurringSeries[]
   slotRequests SlotRequest[]
@@ -69,11 +70,25 @@ model Lesson {
   recurringSeries RecurringSeries? @relation(fields: [recurringSeriesId], references: [id], onDelete: SetNull)
   user        User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
   payments    Payment[]
+  participants LessonParticipant[]
   telegramNotificationLogs TelegramNotificationLog[]
 
   @@index([startTime])
   @@index([userId, startTime])
   @@index([recurringSeriesId])
+}
+
+model LessonParticipant {
+  id        Int      @id @default(autoincrement())
+  lessonId  Int      @map("lesson_id")
+  clientId  Int      @map("client_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, clientId])
+  @@index([clientId])
+  @@map("lesson_participants")
 }
 
 model TelegramNotificationLog {

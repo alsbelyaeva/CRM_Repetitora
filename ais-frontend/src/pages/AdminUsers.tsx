@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../utils/apiBase';
 import { Users, Shield, ShieldOff, Mail, Calendar, MessageCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 
 interface User {
@@ -24,6 +25,7 @@ interface User {
 }
 
 export default function AdminUsers() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -45,6 +47,11 @@ export default function AdminUsers() {
   };
 
   const toggleAdminRole = async (userId: string, currentRole: string) => {
+    if (userId === currentUser?.id) {
+      alert('Нельзя изменить собственную роль администратора');
+      return;
+    }
+
     const newRole = currentRole === 'ADMIN' ? 'TEACHER' : 'ADMIN';
     const action = newRole === 'ADMIN' ? 'выдать' : 'забрать';
     
@@ -74,6 +81,8 @@ export default function AdminUsers() {
       ? { label: 'Подключен', className: 'bg-emerald-100 text-emerald-800' }
       : { label: 'Не подключен', className: 'bg-gray-100 text-gray-700' };
   };
+
+  const isCurrentUser = (userId: string) => userId === currentUser?.id;
 
   return (
     <div>
@@ -165,13 +174,21 @@ export default function AdminUsers() {
 
                 <button
                   onClick={() => toggleAdminRole(user.id, user.role)}
+                  disabled={isCurrentUser(user.id)}
                   className={`flex w-full items-center justify-center gap-2 px-3 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    user.role === 'ADMIN'
+                    isCurrentUser(user.id)
+                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                      : user.role === 'ADMIN'
                       ? 'bg-red-100 text-red-700 hover:bg-red-200'
                       : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                   }`}
                 >
-                  {user.role === 'ADMIN' ? (
+                  {isCurrentUser(user.id) ? (
+                    <>
+                      <Shield className="w-4 h-4" />
+                      Ваш аккаунт
+                    </>
+                  ) : user.role === 'ADMIN' ? (
                     <>
                       <ShieldOff className="w-4 h-4" />
                       Забрать права
@@ -301,13 +318,21 @@ export default function AdminUsers() {
                     <td className="px-6 py-4">
                       <button
                         onClick={() => toggleAdminRole(user.id, user.role)}
+                        disabled={isCurrentUser(user.id)}
                         className={`flex items-center gap-2 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                          user.role === 'ADMIN'
+                          isCurrentUser(user.id)
+                            ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                            : user.role === 'ADMIN'
                             ? 'bg-red-100 text-red-700 hover:bg-red-200'
                             : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                         }`}
                       >
-                        {user.role === 'ADMIN' ? (
+                        {isCurrentUser(user.id) ? (
+                          <>
+                            <Shield className="w-4 h-4" />
+                            Ваш аккаунт
+                          </>
+                        ) : user.role === 'ADMIN' ? (
                           <>
                             <ShieldOff className="w-4 h-4" />
                             Забрать права

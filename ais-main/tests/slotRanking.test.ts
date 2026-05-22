@@ -25,8 +25,8 @@ describe('Smart Slotting API', () => {
         .send({
           clientId: seed.client.id,
           proposedSlots: [
-            { from: '2026-05-11T12:00:00+03:00', to: '2026-05-11T13:00:00+03:00' },
-            { from: '2026-05-11T10:30:00+03:00', to: '2026-05-11T11:30:00+03:00' },
+            { from: '2026-06-11T12:00:00+03:00', to: '2026-06-11T13:00:00+03:00' },
+            { from: '2026-06-11T10:30:00+03:00', to: '2026-06-11T11:30:00+03:00' },
           ],
         });
 
@@ -46,13 +46,46 @@ describe('Smart Slotting API', () => {
         .send({
           clientId: seed.client.id,
           proposedSlots: [
-            { from: '2026-05-12T18:15:00+03:00', to: '2026-05-12T19:15:00+03:00' },
+            { from: '2026-06-12T18:15:00+03:00', to: '2026-06-12T19:15:00+03:00' },
           ],
         });
 
       expect(res.status).toBe(200);
       expect(res.body.rankedSlots[0].hasConflict).toBe(true);
       expect(res.body.rankedSlots[0].conflictingLesson.kind).toBe('event');
+    });
+  });
+
+  it('POST /api/slots/rank использует безопасные веса по умолчанию, если сохраненная сумма весов равна нулю', async () => {
+    await testPrisma.slotWeight.update({
+      where: { userId: seed.teacher.id },
+      data: {
+        wTime: 0,
+        wCompact: 0,
+        wWorkingDay: 0,
+        wPriority: 0,
+        wTravel: 0,
+      },
+    });
+
+    await withoutEnv(['TWO_GIS_API_KEY'], async () => {
+      const res = await request(app)
+        .post('/api/slots/rank')
+        .set(authHeader(seed.teacher))
+        .send({
+          clientId: seed.client.id,
+          proposedSlots: [
+            { from: '2026-06-11T12:00:00+03:00', to: '2026-06-11T13:00:00+03:00' },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.rankedSlots[0].score).toBeGreaterThan(0);
+
+      const weightedBreakdown = res.body.rankedSlots[0].weightedBreakdown;
+      expect(
+        Object.values(weightedBreakdown).some((value) => Number(value) > 0)
+      ).toBe(true);
     });
   });
 
@@ -63,8 +96,8 @@ describe('Smart Slotting API', () => {
       .send({
         clientId: seed.client.id,
         selectedSlot: {
-          from: '2026-05-12T18:15:00+03:00',
-          to: '2026-05-12T19:15:00+03:00',
+          from: '2026-06-12T18:15:00+03:00',
+          to: '2026-06-12T19:15:00+03:00',
         },
         durationMin: 60,
         type: 'INDIVIDUAL',

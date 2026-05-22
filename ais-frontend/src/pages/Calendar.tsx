@@ -15,6 +15,11 @@ interface Lesson {
   notes?: string;
   recurringSeriesId?: number | null;
   client: { id?: number; fullName: string; address?: string | null };
+  participants?: Array<{
+    id?: number;
+    clientId?: number;
+    client: { id?: number; fullName: string; address?: string | null };
+  }>;
 }
 
 interface ScheduleEvent {
@@ -63,6 +68,25 @@ function isFutureCalendarDay(value: string | Date) {
   return startOfLocalDay(date).getTime() > startOfLocalDay(new Date()).getTime();
 }
 
+function isPastCalendarDay(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  return startOfLocalDay(date).getTime() < startOfLocalDay(new Date()).getTime();
+}
+
+function isGroupLessonType(type: string) {
+  return type === 'Групповое' || type === 'GROUP';
+}
+
+function normalizeLessonTypeForForm(type: string) {
+  const typeMap: Record<string, string> = {
+    INDIVIDUAL: 'Индивидуальное',
+    GROUP: 'Групповое',
+    TRIAL: 'Пробное',
+  };
+
+  return typeMap[type] || type;
+}
+
 export default function Calendar() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
@@ -99,6 +123,7 @@ export default function Calendar() {
 
   const [formData, setFormData] = useState({
     clientId: '',
+    participantClientIds: [] as string[],
     date: '',
     startTime: '',
     durationMin: 60,
@@ -124,6 +149,7 @@ export default function Calendar() {
   });
 
   const teacherQuery = selectedUserId ? `?userId=${selectedUserId}` : '';
+  const calendarReady = !isAdmin || Boolean(selectedUserId);
 
   useEffect(() => {
     if (isAdmin) {
@@ -134,6 +160,17 @@ export default function Calendar() {
   }, [isAdmin]);
 
   useEffect(() => {
+    if (isAdmin && !selectedUserId) {
+      setLessons([]);
+      setEvents([]);
+      setClients([]);
+      setCancelledCount(0);
+      setDoneCount(0);
+      setSelectedMobileDay(null);
+      setMobileCancelledExpanded(false);
+      return;
+    }
+
     fetchLessons();
     fetchEvents();
     fetchClients();
@@ -141,6 +178,8 @@ export default function Calendar() {
   }, [selectedUserId]);
 
   const fetchLessons = async () => {
+    if (isAdmin && !selectedUserId) return;
+
     try {
       const response = await axios.get(`${API_URL}/api/lessons${teacherQuery}`);
       const sorted = response.data.sort((a: Lesson, b: Lesson) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
@@ -151,6 +190,8 @@ export default function Calendar() {
   };
 
   const fetchEvents = async () => {
+    if (isAdmin && !selectedUserId) return;
+
     try {
       const response = await axios.get(`${API_URL}/api/schedule-events${teacherQuery}`);
       const sorted = response.data.sort((a: ScheduleEvent, b: ScheduleEvent) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
@@ -161,6 +202,8 @@ export default function Calendar() {
   };
 
   const fetchClients = async () => {
+    if (isAdmin && !selectedUserId) return;
+
     try {
       const response = await axios.get(`${API_URL}/api/clients${teacherQuery}`);
       setClients(response.data);
@@ -170,6 +213,8 @@ export default function Calendar() {
   };
 
   const fetchLessonStats = async () => {
+    if (isAdmin && !selectedUserId) return;
+
     try {
       const response = await axios.get(`${API_URL}/api/lessons/stats${teacherQuery}`);
       setCancelledCount(response.data.cancelled || 0);
@@ -272,18 +317,48 @@ export default function Calendar() {
     }
   };
 
+  const getSelectedParticipantIds = () => {
+    const primaryClientId = Number(formData.clientId);
+    if (!Number.isInteger(primaryClientId) || primaryClientId <= 0) return [];
+
+    const ids = isGroupLessonType(formData.type)
+      ? [primaryClientId, ...formData.participantClientIds.map((id) => Number(id))]
+      : [primaryClientId];
+
+    return Array.from(new Set(ids.filter((id) => Number.isInteger(id) && id > 0)));
+  };
+
+  const toggleParticipant = (clientId: number) => {
+    const value = String(clientId);
+    setFormData((current) => ({
+      ...current,
+      participantClientIds: current.participantClientIds.includes(value)
+        ? current.participantClientIds.filter((id) => id !== value)
+        : [...current.participantClientIds, value],
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const startDateTime = `${formData.date}T${formData.startTime}:00`;
+    const startDate = new Date(startDateTime);
+    const shouldSaveAsDone = isPastCalendarDay(startDate);
     const operationLabel = editingLesson ? 'обновления занятия' : 'создания занятия';
+    const participantClientIds = getSelectedParticipantIds();
+
+    if (isGroupLessonType(formData.type) && participantClientIds.length < 2) {
+      alert('Для группового занятия выберите минимум двух участников');
+      return;
+    }
 
     try {
       const formattedData = {
         clientId: parseInt(formData.clientId),
+        participantClientIds,
         startTime: startDateTime,
         durationMin: parseInt(formData.durationMin.toString()),
         type: formData.type,
-        status: formData.status,
+        status: shouldSaveAsDone && formData.status === 'PLANNED' ? 'DONE' : formData.status,
         notes: formData.notes || null,
         ...(isAdmin && selectedUserId ? { userId: selectedUserId } : {}),
       };
@@ -294,6 +369,7 @@ export default function Calendar() {
         : formData.repeatEnabled
         ? await axios.post(`${API_URL}/api/lessons/recurring-series`, {
             clientId: formattedData.clientId,
+            participantClientIds: formattedData.participantClientIds,
             weekday: formData.repeatWeekday,
             startTime: formData.startTime,
             durationMin: formattedData.durationMin,
@@ -311,7 +387,7 @@ export default function Calendar() {
       resetForm();
 
       if (editingLesson) {
-        alert('✅ Занятие обновлено');
+        alert(shouldSaveAsDone ? '✅ Занятие за прошедшую дату сохранено как проведенное' : '✅ Занятие обновлено');
       } else if (formData.repeatEnabled) {
         const skipped = response.data?.skippedCount || 0;
         const conflicts = response.data?.conflicts || [];
@@ -320,7 +396,7 @@ export default function Calendar() {
         )).join('\n');
         alert(`✅ Создано регулярных занятий: ${response.data?.createdCount || 0}` + (skipped ? `\n\nКонфликтующие даты добавлены в запросы слотов: ${skipped}\n${conflictText}` : ''));
       } else {
-        alert('✅ Занятие успешно создано!');
+        alert(shouldSaveAsDone ? '✅ Занятие за прошедшую дату создано как проведенное' : '✅ Занятие успешно создано!');
       }
     } catch (error: any) {
       console.error(`Ошибка ${operationLabel}:`, error.response?.data || error);
@@ -381,6 +457,7 @@ export default function Calendar() {
     setRecurringEditScope('single');
     setFormData({
       clientId: '',
+      participantClientIds: [],
       date: '',
       startTime: '',
       durationMin: 60,
@@ -411,14 +488,23 @@ export default function Calendar() {
 
   const openEditLesson = (lesson: Lesson) => {
     const start = new Date(lesson.startTime);
+    const participantIds = lesson.participants?.length
+      ? lesson.participants
+          .map((participant) => participant.client.id || participant.clientId)
+          .filter((id): id is number => Boolean(id))
+          .map(String)
+      : lesson.client?.id
+        ? [String(lesson.client.id)]
+        : [];
     setEditingLesson(lesson);
     setRecurringEditScope('single');
     setFormData({
       clientId: String(lesson.client?.id || ''),
+      participantClientIds: participantIds,
       date: dateToInputValue(start),
       startTime: timeToInputValue(start),
       durationMin: lesson.durationMin,
-      type: lesson.type,
+      type: normalizeLessonTypeForForm(lesson.type),
       status: lesson.status,
       notes: lesson.notes || '',
       repeatEnabled: false,
@@ -483,7 +569,7 @@ export default function Calendar() {
       startTime: lesson.startTime,
       durationMin: lesson.durationMin,
       status: lesson.status,
-      title: lesson.client.fullName,
+      title: getLessonParticipantTitle(lesson),
       lesson,
     })),
     ...events.map((event): CalendarItem => ({
@@ -565,11 +651,32 @@ export default function Calendar() {
     return clientFromList?.address?.trim() || '';
   };
 
+  const getLessonParticipantClients = (lesson: Lesson) => {
+    const participantClients = lesson.participants
+      ?.map((participant) => participant.client)
+      .filter((client): client is Client => Boolean(client?.fullName)) || [];
+
+    if (participantClients.length > 0) {
+      return participantClients;
+    }
+
+    return lesson.client ? [lesson.client as Client] : [];
+  };
+
+  const getLessonParticipantTitle = (lesson: Lesson) => {
+    const participantClients = getLessonParticipantClients(lesson);
+    if (participantClients.length <= 1) {
+      return participantClients[0]?.fullName || lesson.client.fullName;
+    }
+
+    return `Группа: ${participantClients.map((client) => client.fullName).join(', ')}`;
+  };
+
   const days = getCalendarGridDays(selectedDate);
   const selectedMobileDayItems = selectedMobileDay ? getItemsForDay(selectedMobileDay) : [];
   const selectedMobileActiveItems = selectedMobileDayItems.filter((item) => item.status !== 'CANCELLED');
   const selectedMobileCancelledItems = selectedMobileDayItems.filter((item) => item.status === 'CANCELLED');
-  const canCreateEvent = !isAdmin || Boolean(selectedUserId);
+  const canCreateCalendarItem = calendarReady;
 
   return (
     <div>
@@ -590,18 +697,21 @@ export default function Calendar() {
         <div className="flex flex-col sm:flex-row gap-2">
           <button
             onClick={() => {
+              if (!canCreateCalendarItem) return;
               resetForm();
               setShowModal(true);
             }}
-            className="flex items-center justify-center w-full sm:w-auto bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={!canCreateCalendarItem}
+            title={!canCreateCalendarItem ? 'Выберите преподавателя' : undefined}
+            className="flex items-center justify-center w-full sm:w-auto bg-blue-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             <Plus className="w-5 h-5 mr-2" />
             Добавить занятие
           </button>
           <button
             onClick={() => openEventModal()}
-            disabled={!canCreateEvent}
-            title={!canCreateEvent ? 'Выберите преподавателя' : undefined}
+            disabled={!canCreateCalendarItem}
+            title={!canCreateCalendarItem ? 'Выберите преподавателя' : undefined}
             className="flex items-center justify-center w-full sm:w-auto bg-amber-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-amber-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             <Briefcase className="w-5 h-5 mr-2" />
@@ -618,7 +728,7 @@ export default function Calendar() {
             onChange={(e) => setSelectedUserId(e.target.value)}
             className="w-full md:w-80 px-4 py-3 md:py-2 border rounded-lg bg-white"
           >
-            <option value="">Все преподаватели</option>
+            <option value="">Выберите преподавателя</option>
             {getTeacherOptions(users).map((teacher) => (
               <option key={teacher.id} value={teacher.id}>{getUserLabel(teacher)}</option>
             ))}
@@ -626,6 +736,14 @@ export default function Calendar() {
         </div>
       )}
 
+      {!calendarReady ? (
+        <div className="bg-white rounded-lg shadow p-6 md:p-8 text-center">
+          <h2 className="text-xl font-bold text-gray-800">Выберите преподавателя</h2>
+          <p className="mt-2 text-gray-600">
+            Календарь покажет занятия и события только выбранного преподавателя.
+          </p>
+        </div>
+      ) : (
       <div className="bg-white rounded-lg shadow p-4 md:p-6">
         <div className="flex items-center justify-between gap-2 mb-6">
           <button
@@ -770,6 +888,7 @@ export default function Calendar() {
           })}
         </div>
       </div>
+      )}
 
       {selectedMobileDay && (
         <div className="md:hidden fixed inset-0 bg-black bg-opacity-40 z-50 flex items-end">
@@ -975,7 +1094,10 @@ export default function Calendar() {
             </div>
 
             <div className="space-y-4">
-              <div><p className="text-sm text-gray-600">Клиент</p><p className="font-semibold">{selectedLesson.client.fullName}</p></div>
+              <div>
+                <p className="text-sm text-gray-600">{getLessonParticipantClients(selectedLesson).length > 1 ? 'Участники' : 'Клиент'}</p>
+                <p className="font-semibold">{getLessonParticipantTitle(selectedLesson)}</p>
+              </div>
               <div>
                 <p className="text-sm text-gray-600">Адрес ученика</p>
                 <p className="font-semibold">{getLessonClientAddress(selectedLesson) || 'Адрес не задан'}</p>
@@ -985,7 +1107,7 @@ export default function Calendar() {
                 <p className="font-semibold">{new Date(selectedLesson.startTime).toLocaleString('ru-RU')}</p>
                 <p className="text-sm">{formatLessonTime(selectedLesson.startTime, selectedLesson.durationMin)}</p>
               </div>
-              <div><p className="text-sm text-gray-600">Тип</p><p className="font-semibold">{selectedLesson.type}{selectedLesson.recurringSeriesId ? ' · регулярное' : ''}</p></div>
+              <div><p className="text-sm text-gray-600">Тип</p><p className="font-semibold">{normalizeLessonTypeForForm(selectedLesson.type)}{selectedLesson.recurringSeriesId ? ' · регулярное' : ''}</p></div>
               <div><p className="text-sm text-gray-600">Длительность</p><p className="font-semibold">{selectedLesson.durationMin} мин</p></div>
               <div>
                 <p className="text-sm text-gray-600">Статус</p>
@@ -1026,7 +1148,7 @@ export default function Calendar() {
                 </button>
               </div>
 
-              {(selectedLesson.status === 'DONE' || selectedLesson.status === 'CANCELLED') && (
+              {(selectedLesson.status === 'DONE' || selectedLesson.status === 'CANCELLED') && !isPastCalendarDay(selectedLesson.startTime) && (
                 <button onClick={() => updateLessonStatus(selectedLesson.id, 'PLANNED')} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
                   <Edit className="w-5 h-5" />
                   Вернуть в запланированные
@@ -1184,8 +1306,22 @@ export default function Calendar() {
 
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
-                <label className="block text-sm font-semibold mb-2">Клиент</label>
-                <select value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: e.target.value })} className="w-full px-4 py-3 md:py-2 border rounded-lg" required>
+                <label className="block text-sm font-semibold mb-2">{isGroupLessonType(formData.type) ? 'Основной клиент' : 'Клиент'}</label>
+                <select
+                  value={formData.clientId}
+                  onChange={(e) => {
+                    const nextClientId = e.target.value;
+                    setFormData({
+                      ...formData,
+                      clientId: nextClientId,
+                      participantClientIds: isGroupLessonType(formData.type)
+                        ? Array.from(new Set([nextClientId, ...formData.participantClientIds])).filter(Boolean)
+                        : [],
+                    });
+                  }}
+                  className="w-full px-4 py-3 md:py-2 border rounded-lg"
+                  required
+                >
                   <option value="">Выберите клиента</option>
                   {clients.map((client) => <option key={client.id} value={client.id}>{client.fullName}</option>)}
                 </select>
@@ -1230,12 +1366,53 @@ export default function Calendar() {
 
               <div className="mb-4">
                 <label className="block text-sm font-semibold mb-2">Тип</label>
-                <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className="w-full px-4 py-3 md:py-2 border rounded-lg">
+                <select
+                  value={formData.type}
+                  onChange={(e) => {
+                    const nextType = e.target.value;
+                    setFormData({
+                      ...formData,
+                      type: nextType,
+                      participantClientIds: nextType === 'Групповое'
+                        ? Array.from(new Set([formData.clientId, ...formData.participantClientIds])).filter(Boolean)
+                        : [],
+                    });
+                  }}
+                  className="w-full px-4 py-3 md:py-2 border rounded-lg"
+                >
                   <option value="Индивидуальное">Индивидуальное</option>
                   <option value="Групповое">Групповое</option>
                   <option value="Пробное">Пробное</option>
                 </select>
               </div>
+
+              {isGroupLessonType(formData.type) && (
+                <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <label className="block text-sm font-semibold mb-2">Участники группы</label>
+                  <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                    {clients.map((client) => {
+                      const value = String(client.id);
+                      const isPrimary = formData.clientId === value;
+                      const checked = isPrimary || formData.participantClientIds.includes(value);
+
+                      return (
+                        <label key={client.id} className="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={isPrimary}
+                            onChange={() => toggleParticipant(client.id)}
+                            className="h-4 w-4"
+                          />
+                          <span className="flex-1">{client.fullName}</span>
+                          {isPrimary && <span className="text-xs font-semibold text-blue-600">основной</span>}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">Выбрано участников: {getSelectedParticipantIds().length}</p>
+                </div>
+              )}
 
               <div className="mb-4">
                 <label className="block text-sm font-semibold mb-2">Примечание</label>

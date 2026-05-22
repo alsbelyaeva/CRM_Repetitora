@@ -43,6 +43,7 @@ interface RankedSlot {
   travelScore?: number;
   travelTimeMinutes?: number | null;
   availableGapMinutes?: number | null;
+  travelDetails?: TravelDetails | null;
   explanation: string;
   hasConflict: boolean;
   lessonId?: number | null;
@@ -54,6 +55,27 @@ interface RankedSlot {
     startTime: string;
     kind?: 'lesson' | 'event';
   };
+}
+
+interface TravelLegDetails {
+  direction: 'before' | 'after';
+  source?: 'lesson' | 'event' | 'user_address';
+  travelTimeMinutes: number | null;
+  travelStatus?: string;
+  availableGapMinutes: number | null;
+  desiredBreakMinutes?: number;
+  score: number;
+  explanation?: string;
+}
+
+interface TravelDetails {
+  score: number;
+  travelTimeMinutes: number | null;
+  availableGapMinutes: number | null;
+  desiredBreakMinutes?: number;
+  explanation?: string;
+  before?: TravelLegDetails;
+  after?: TravelLegDetails;
 }
 
 interface Client {
@@ -93,6 +115,45 @@ interface SlotInput {
   durationMin: number;
 }
 
+type ScoreBreakdown = RankedSlot['breakdown'];
+
+const SCORE_KEYS: Array<keyof ScoreBreakdown> = [
+  'timeScore',
+  'compactScore',
+  'workingDayScore',
+  'priorityScore',
+  'travelScore',
+];
+
+function getBreakdownTotal(breakdown: ScoreBreakdown) {
+  return SCORE_KEYS.reduce((sum, key) => sum + Math.max(0, Number(breakdown[key]) || 0), 0);
+}
+
+function hasPositiveBreakdown(breakdown?: Partial<ScoreBreakdown> | null) {
+  return Boolean(breakdown && SCORE_KEYS.some((key) => Number(breakdown[key]) > 0));
+}
+
+function deriveWeightedBreakdown(score: number, breakdown: ScoreBreakdown): ScoreBreakdown {
+  const total = getBreakdownTotal(breakdown);
+  if (score <= 0 || total <= 0) {
+    return {
+      timeScore: 0,
+      compactScore: 0,
+      workingDayScore: 0,
+      priorityScore: 0,
+      travelScore: 0,
+    };
+  }
+
+  return {
+    timeScore: (Math.max(0, Number(breakdown.timeScore) || 0) / total) * score,
+    compactScore: (Math.max(0, Number(breakdown.compactScore) || 0) / total) * score,
+    workingDayScore: (Math.max(0, Number(breakdown.workingDayScore) || 0) / total) * score,
+    priorityScore: (Math.max(0, Number(breakdown.priorityScore) || 0) / total) * score,
+    travelScore: (Math.max(0, Number(breakdown.travelScore) || 0) / total) * score,
+  };
+}
+
 function formatToISOLocal(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -106,6 +167,7 @@ function formatToISOLocal(date: Date): string {
 
 function normalizeSlot(raw: any, fallbackStatus = 'PENDING'): RankedSlot | null {
   if (raw?.from && raw?.to) {
+    const score = Number(raw.score ?? 0);
     const breakdown = {
       timeScore: 0,
       compactScore: 0,
@@ -114,18 +176,23 @@ function normalizeSlot(raw: any, fallbackStatus = 'PENDING'): RankedSlot | null 
       travelScore: 0.5,
       ...(raw.breakdown ?? {}),
     };
-    const weightedBreakdown = raw.weightedBreakdown ?? {
-      timeScore: 0,
-      compactScore: 0,
-      workingDayScore: 0,
-      priorityScore: 0,
-      travelScore: 0,
-    };
+    const hasStoredWeightedBreakdown = hasPositiveBreakdown(raw.weightedBreakdown);
+    const weightedBreakdown = hasStoredWeightedBreakdown
+      ? raw.weightedBreakdown
+      : hasPositiveBreakdown(raw.breakdown)
+        ? deriveWeightedBreakdown(score, breakdown)
+        : {
+            timeScore: 0,
+            compactScore: 0,
+            workingDayScore: 0,
+            priorityScore: 0,
+            travelScore: 0,
+          };
 
     return {
       from: raw.from,
       to: raw.to,
-      score: Number(raw.score ?? 0),
+      score,
       breakdown,
       weightedBreakdown,
       criterionReasons: raw.criterionReasons ?? {},
@@ -133,6 +200,7 @@ function normalizeSlot(raw: any, fallbackStatus = 'PENDING'): RankedSlot | null 
       travelScore: Number(raw.travelScore ?? breakdown.travelScore ?? 0.5),
       travelTimeMinutes: raw.travelTimeMinutes ?? null,
       availableGapMinutes: raw.availableGapMinutes ?? null,
+      travelDetails: raw.travelDetails ?? null,
       explanation: raw.explanation || 'Нейтральный слот',
       hasConflict: Boolean(raw.hasConflict),
       lessonId: raw.lessonId ?? null,
@@ -168,6 +236,7 @@ function normalizeSlot(raw: any, fallbackStatus = 'PENDING'): RankedSlot | null 
       travelScore: 0.5,
       travelTimeMinutes: null,
       availableGapMinutes: null,
+      travelDetails: null,
       explanation: 'Слот создан до внедрения ранжирования',
       hasConflict: false,
       lessonId: raw.lessonId ?? null,
@@ -206,10 +275,34 @@ function isConfirmedStatus(status?: string) {
   return Boolean(status && CONFIRMED_STATUSES.includes(status));
 }
 
+function isCancelledSlot(request: ClientRequest, slot: RankedSlot) {
+  return isCancelledStatus(request.status) || isCancelledStatus(slot.status);
+}
+
+function isAssignedSlot(request: ClientRequest, slot: RankedSlot) {
+  if (isCancelledSlot(request, slot)) return false;
+  return isConfirmedStatus(request.status) || isConfirmedStatus(slot.status) || Boolean(slot.lessonId);
+}
+
+function isCompletedRequest(request: ClientRequest) {
+  return isConfirmedStatus(request.status) || request.slots.some(slot => isAssignedSlot(request, slot));
+}
+
 function getStatusLabel(status?: string) {
   if (isCancelledStatus(status)) return 'Отменено';
   if (isConfirmedStatus(status)) return 'Подтверждено';
   return 'Активно';
+}
+
+function formatRequestCount(count: number) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const word = mod10 === 1 && mod100 !== 11
+    ? 'вариант'
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+      ? 'варианта'
+      : 'вариантов';
+  return `${count} ${word} на это время`;
 }
 
 function getConfirmedSlotView(slot: RankedSlot, lessonId?: number, recurringSeriesId?: number): RankedSlot {
@@ -242,6 +335,15 @@ function formatDateOnly(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function isPastCalendarDay(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  return startOfLocalDay(date).getTime() < startOfLocalDay(new Date()).getTime();
+}
+
 function formatTimeOnly(date: Date) {
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -254,9 +356,163 @@ function capitalizeExplanation(text: string) {
   return trimmed[0].toLocaleUpperCase('ru-RU') + trimmed.slice(1);
 }
 
+function isImpossibleTravelLeg(leg?: TravelLegDetails | null) {
+  return Boolean(
+    leg &&
+    leg.travelTimeMinutes !== null &&
+    leg.availableGapMinutes !== null &&
+    Number(leg.availableGapMinutes) < Number(leg.travelTimeMinutes)
+  );
+}
+
+function isTightUnverifiedTravelLeg(leg?: TravelLegDetails | null) {
+  if (!leg || leg.travelTimeMinutes !== null || leg.availableGapMinutes === null) return false;
+  const desiredBreak = leg.desiredBreakMinutes ?? 30;
+  return Number(leg.availableGapMinutes) < desiredBreak;
+}
+
+function isCriticalTravelLeg(leg?: TravelLegDetails | null) {
+  return isImpossibleTravelLeg(leg) || isTightUnverifiedTravelLeg(leg);
+}
+
+function hasImpossibleTravel(slot: RankedSlot) {
+  const details = slot.travelDetails;
+  return (
+    isImpossibleTravelLeg(details?.before) ||
+    isImpossibleTravelLeg(details?.after) ||
+    (
+      !details?.before &&
+      !details?.after &&
+      slot.travelTimeMinutes !== null &&
+      slot.travelTimeMinutes !== undefined &&
+      slot.availableGapMinutes !== null &&
+      slot.availableGapMinutes !== undefined &&
+      Number(slot.availableGapMinutes) < Number(slot.travelTimeMinutes)
+    )
+  );
+}
+
+function hasCriticalTravel(slot: RankedSlot) {
+  const details = slot.travelDetails;
+  return (
+    isCriticalTravelLeg(details?.before) ||
+    isCriticalTravelLeg(details?.after) ||
+    hasImpossibleTravel(slot)
+  );
+}
+
+function isVeryLargeTravelGap(minutes: number | null) {
+  return minutes !== null && minutes >= 24 * 60;
+}
+
+function formatTravelLeg(leg: TravelLegDetails) {
+  const itemLabel = leg.source === 'event' ? 'события' : 'занятия';
+  const label = leg.direction === 'before'
+    ? `После предыдущего ${itemLabel}`
+    : `До следующего ${itemLabel}`;
+  const gap = leg.availableGapMinutes;
+  const travel = leg.travelTimeMinutes;
+
+  if (leg.source === 'user_address') {
+    if (travel === 0) {
+      return 'Первое занятие в этот день: адрес совпадает с адресом преподавателя, дорога не требуется.';
+    }
+
+    if (travel !== null) {
+      return `Первое занятие в этот день: дорога от адреса преподавателя около ${travel} мин.`;
+    }
+
+    return leg.explanation || 'Первое занятие в этот день: маршрут от адреса преподавателя не рассчитан.';
+  }
+
+  if (isVeryLargeTravelGap(gap)) {
+    return leg.direction === 'before'
+      ? `Предыдущее ${itemLabel} в другой день, дорога между занятиями не ограничивает этот слот.`
+      : `Следующее ${itemLabel} в другой день, дорога между занятиями не ограничивает этот слот.`;
+  }
+
+  if (isImpossibleTravelLeg(leg)) {
+    return `${label}: между занятиями ${gap} мин, дорога занимает ${travel} мин. Вы не успеете добраться.`;
+  }
+
+  if (isTightUnverifiedTravelLeg(leg)) {
+    return `${label}: между занятиями только ${gap} мин, маршрут не рассчитан. Вы можете не успеть добраться.`;
+  }
+
+  if (travel !== null && gap !== null) {
+    return `${label}: дорога ${travel} мин, между занятиями ${gap} мин.`;
+  }
+
+  if (travel !== null) {
+    return `${label}: дорога ${travel} мин.`;
+  }
+
+  return '';
+}
+
+function getTravelCardDetail(slot: RankedSlot) {
+  const details = slot.travelDetails;
+  const legs = [details?.before, details?.after].filter((leg): leg is TravelLegDetails => Boolean(leg));
+  const sameDayNeighborLegs = legs.filter(leg => (
+    leg.source !== 'user_address' && !isVeryLargeTravelGap(leg.availableGapMinutes)
+  ));
+  const userAddressLeg = legs.find(leg => leg.source === 'user_address');
+
+  if (sameDayNeighborLegs.length === 0) {
+    const onlyLessonText = 'Единственное занятие в этот день: дорога между занятиями не ограничивает слот.';
+    const travel = userAddressLeg?.travelTimeMinutes;
+
+    if (travel === 0) {
+      return `${onlyLessonText} Адрес совпадает с адресом преподавателя.`;
+    }
+
+    if (travel !== null && travel !== undefined) {
+      return `${onlyLessonText} От адреса преподавателя до клиента: около ${travel} мин.`;
+    }
+
+    return onlyLessonText;
+  }
+
+  const criticalLegs = sameDayNeighborLegs.filter(isCriticalTravelLeg);
+  const lines: string[] = criticalLegs.length > 0
+    ? criticalLegs.map(formatTravelLeg)
+    : sameDayNeighborLegs
+        .filter(leg => leg.travelTimeMinutes !== null)
+        .map(formatTravelLeg);
+
+  if (lines.length === 0) {
+    lines.push(
+      ...[
+        slot.travelTimeMinutes === null || slot.travelTimeMinutes === undefined
+          ? ''
+          : `Дорога: ${slot.travelTimeMinutes} мин.`,
+        slot.availableGapMinutes !== null && slot.availableGapMinutes !== undefined
+          ? `Окно: ${slot.availableGapMinutes} мин.`
+          : '',
+      ].filter(Boolean)
+    );
+  }
+
+  if (hasImpossibleTravel(slot) && criticalLegs.length === 0) {
+    lines.unshift(
+      `Не успеть: доступно ${slot.availableGapMinutes} мин, дорога занимает ${slot.travelTimeMinutes} мин.`
+    );
+  }
+
+  const detail = Array.from(new Set(lines.filter(Boolean))).join(' ');
+  if (detail) return detail;
+  if (details?.explanation) return details.explanation;
+  if (Number(slot.travelScore) > 0) {
+    return 'Подробности дороги не сохранены для этого слота. Обновите оценку слотов, чтобы пересчитать маршрут.';
+  }
+
+  return '';
+}
+
 function getScoreCards(slot: RankedSlot) {
   const contribution = slot.weightedBreakdown || slot.breakdown;
   const reasons = slot.criterionReasons || {};
+  const travelCritical = hasCriticalTravel(slot);
   const cards = [
     {
       key: 'time',
@@ -298,22 +554,15 @@ function getScoreCards(slot: RankedSlot) {
       key: 'travel',
       label: 'Дорога',
       value: contribution.travelScore,
-      bg: 'bg-cyan-50',
-      border: 'border-cyan-200',
-      text: 'text-cyan-700',
-      detail: [
-        reasons.travel,
-        slot.travelTimeMinutes === null || slot.travelTimeMinutes === undefined
-          ? ''
-          : `Дорога: ${slot.travelTimeMinutes} мин`,
-        slot.availableGapMinutes !== null && slot.availableGapMinutes !== undefined
-          ? `Окно: ${slot.availableGapMinutes} мин`
-          : '',
-      ].filter(Boolean).join(' '),
+      bg: travelCritical ? 'bg-red-50' : 'bg-cyan-50',
+      border: travelCritical ? 'border-red-300' : 'border-cyan-200',
+      text: travelCritical ? 'text-red-700' : 'text-cyan-700',
+      detail: getTravelCardDetail(slot) || reasons.travel,
+      warning: travelCritical,
     },
   ];
 
-  return cards.filter(card => Number(card.value) > 0 || (card.key === 'travel' && Boolean(card.detail)));
+  return cards;
 }
 
 export default function SlotRequests() {
@@ -337,8 +586,12 @@ export default function SlotRequests() {
 
   const teacherQuery = selectedUserId ? `?userId=${selectedUserId}` : '';
   const slotMatchesFilter = (request: ClientRequest, slot: RankedSlot) => {
-    if (requestFilter === 'cancelled') return isCancelledStatus(request.status) || isCancelledStatus(slot.status);
-    if (requestFilter === 'active') return !isCancelledStatus(request.status) && !isCancelledStatus(slot.status);
+    if (isCompletedRequest(request)) return false;
+
+    const cancelled = isCancelledSlot(request, slot);
+    if (requestFilter === 'cancelled') return cancelled;
+    if (isAssignedSlot(request, slot)) return false;
+    if (requestFilter === 'active') return !cancelled;
     return true;
   };
 
@@ -397,7 +650,11 @@ export default function SlotRequests() {
   };
 
   const refreshPendingSlotScores = async (request: ClientRequest): Promise<ClientRequest> => {
-    const slotsToRank = request.slots.filter(slot => slot.from && slot.to);
+    const slotsToRank = request.slots.filter(slot => (
+      slot.from &&
+      slot.to &&
+      !isAssignedSlot(request, slot)
+    ));
 
     if (slotsToRank.length === 0) return request;
 
@@ -428,6 +685,7 @@ export default function SlotRequests() {
             travelScore: ranked.travelScore,
             travelTimeMinutes: ranked.travelTimeMinutes,
             availableGapMinutes: ranked.availableGapMinutes,
+            travelDetails: ranked.travelDetails ?? null,
             explanation: isConfirmedSlot ? slot.explanation : ranked.explanation,
             hasConflict: isConfirmedSlot ? false : ranked.hasConflict,
             conflictingLesson: isConfirmedSlot ? undefined : ranked.conflictingLesson,
@@ -504,6 +762,11 @@ export default function SlotRequests() {
 
     if (proposedSlots.some(slot => new Date(slot.to) <= new Date(slot.from))) {
       alert('Время окончания слота должно быть позже времени начала');
+      return;
+    }
+
+    if (proposedSlots.some(slot => isPastCalendarDay(slot.from))) {
+      alert('Запросы слотов нельзя создавать на прошедшие даты. Задним числом занятие можно добавить только в календаре как проведенное.');
       return;
     }
 
@@ -637,6 +900,11 @@ export default function SlotRequests() {
       const duration = Math.round((to.getTime() - from.getTime()) / 60000);
       let createdLessonId: number | undefined;
       let createdSeriesId: number | undefined;
+
+      if (isPastCalendarDay(from)) {
+        alert('Нельзя подтвердить запрос слота за прошедшую дату. Задним числом занятие можно добавить только в календаре как проведенное.');
+        return;
+      }
 
       if (slot.recurrence?.enabled && slot.hasConflict) {
         alert('Первый слот регулярного занятия конфликтует с расписанием. Освободите этот слот или выберите другой вариант для серии.');
@@ -773,10 +1041,10 @@ export default function SlotRequests() {
     return new Date(aRequests[0]?.slot.from ?? 0).getTime() - new Date(bRequests[0]?.slot.from ?? 0).getTime();
   });
   const activeSlotCount = allClientRequests.reduce((sum, request) => (
-    sum + request.slots.filter(slot => !isCancelledStatus(request.status) && !isCancelledStatus(slot.status)).length
+    sum + request.slots.filter(slot => !isCancelledSlot(request, slot) && !isAssignedSlot(request, slot)).length
   ), 0);
   const cancelledSlotCount = allClientRequests.reduce((sum, request) => (
-    sum + request.slots.filter(slot => isCancelledStatus(request.status) || isCancelledStatus(slot.status)).length
+    sum + request.slots.filter(slot => isCancelledSlot(request, slot)).length
   ), 0);
 
   return (
@@ -900,7 +1168,7 @@ export default function SlotRequests() {
                       )}
                       {hasMultipleClients && (
                         <span className="px-3 py-1 bg-yellow-200 text-yellow-900 text-sm rounded-full font-bold">
-                          {requests.length} запроса
+                          {formatRequestCount(requests.length)}
                         </span>
                       )}
                     </div>
@@ -912,6 +1180,7 @@ export default function SlotRequests() {
                       const itemConfirmed = isConfirmedStatus(req.requestStatus) || isConfirmedStatus(req.slot.status);
                       const displaySlot = itemConfirmed ? getConfirmedSlotView(req.slot) : req.slot;
                       const isEventConflict = Boolean(req.slot.hasConflict && req.slot.conflictingLesson?.kind === 'event');
+                      const impossibleTravel = hasCriticalTravel(displaySlot);
 
                       return (
                       <div
@@ -957,11 +1226,19 @@ export default function SlotRequests() {
                                   Регулярное
                                 </span>
                               )}
+                              {impossibleTravel && !itemCancelled && (
+                                <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-800 text-sm rounded-full font-bold">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Не успеть на дорогу
+                                </span>
+                              )}
                             </div>
 
-                            {displaySlot.hasConflict && (
+                            {(displaySlot.hasConflict || impossibleTravel) && (
                               <p className="text-sm mb-3 text-red-700 font-semibold">
-                                {capitalizeExplanation(displaySlot.explanation)}
+                                {impossibleTravel
+                                  ? 'Недостаточно времени между занятиями: проверьте блок “Дорога”.'
+                                  : capitalizeExplanation(displaySlot.explanation)}
                               </p>
                             )}
 
@@ -969,7 +1246,10 @@ export default function SlotRequests() {
                               {getScoreCards(displaySlot).map(card => (
                                 <div key={card.key} className={`${card.bg} p-3 rounded-lg border ${card.border}`}>
                                   <div className="flex items-baseline justify-between gap-3">
-                                    <div className={`text-sm font-semibold ${card.text}`}>{card.label}</div>
+                                    <div className={`inline-flex items-center gap-1 text-sm font-semibold ${card.text}`}>
+                                      {card.warning && <AlertTriangle className="w-4 h-4" />}
+                                      {card.label}
+                                    </div>
                                     <div className={`text-lg font-bold ${card.text}`}>{card.value.toFixed(2)}</div>
                                   </div>
                                   {card.detail && (
@@ -1102,6 +1382,7 @@ export default function SlotRequests() {
                         <input
                           type="date"
                           value={slot.date}
+                          min={formatDateOnly(new Date())}
                           onChange={(e) => updateSlot(idx, 'date', e.target.value)}
                           className="w-full px-3 py-3 md:py-2 border rounded-lg"
                         />

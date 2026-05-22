@@ -1,8 +1,36 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prismaClient';
+import { logAuditAction } from '../services/auditLogService';
 
 function canAccessUserSettings(req: Request, targetUserId: string): boolean {
   return req.user?.role === 'ADMIN' || req.userId === targetUserId;
+}
+
+const DEFAULT_SLOT_WEIGHTS = {
+  wTime: 0.3,
+  wCompact: 0.3,
+  wWorkingDay: 0.2,
+  wPriority: 0.2,
+  wTravel: 0.15,
+};
+
+const WEIGHT_KEYS = ['wTime', 'wCompact', 'wWorkingDay', 'wPriority', 'wTravel'] as const;
+
+function numberOrDefault(value: unknown, fallback: number) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function getWeightSum(weights: Record<typeof WEIGHT_KEYS[number], unknown>) {
+  return WEIGHT_KEYS.reduce((sum, key) => sum + numberOrDefault(weights[key], 0), 0);
+}
+
+function getWeightValue(value: unknown, fallback: number) {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  return Number(value);
 }
 
 // Получить все веса (для админа)
@@ -75,15 +103,25 @@ export async function create(req: Request, res: Response) {
         error: 'Веса для этого пользователя уже существуют' 
       });
     }
+
+    const nextWeights = {
+      wTime: numberOrDefault(wTime, DEFAULT_SLOT_WEIGHTS.wTime),
+      wCompact: numberOrDefault(wCompact, DEFAULT_SLOT_WEIGHTS.wCompact),
+      wWorkingDay: numberOrDefault(wWorkingDay, DEFAULT_SLOT_WEIGHTS.wWorkingDay),
+      wPriority: numberOrDefault(wPriority, DEFAULT_SLOT_WEIGHTS.wPriority),
+      wTravel: numberOrDefault(wTravel, DEFAULT_SLOT_WEIGHTS.wTravel),
+    };
+
+    if (getWeightSum(nextWeights) <= 0) {
+      return res.status(400).json({
+        error: 'Хотя бы один вес ранжирования должен быть больше 0',
+      });
+    }
     
     const weights = await prisma.slotWeight.create({
       data: {
         userId,
-        wTime: Number(wTime) || 0.3,
-        wCompact: Number(wCompact) || 0.3,
-        wWorkingDay: Number(wWorkingDay) || 0.2,
-        wPriority: Number(wPriority) || 0.2,
-        wTravel: Number(wTravel) || 0.15,
+        ...nextWeights,
         workingDays: workingDays || [1, 2, 3, 4, 5],
         preferredTimes: preferredTimes || {
           morning: { period: 'morning', enabled: false, weight: 0.5 },
@@ -98,6 +136,23 @@ export async function create(req: Request, res: Response) {
     });
     
     console.log('✅ [SlotWeights] Веса успешно созданы');
+
+    await logAuditAction({
+      userId,
+      action: 'slotWeights.create',
+      entity: 'SlotWeight',
+      entityId: weights.id,
+      details: {
+        changedBy: req.userId,
+        weights: {
+          wTime: weights.wTime,
+          wCompact: weights.wCompact,
+          wWorkingDay: weights.wWorkingDay,
+          wPriority: weights.wPriority,
+          wTravel: weights.wTravel,
+        },
+      },
+    });
     
     res.status(201).json(weights);
   } catch (err: any) {
@@ -194,6 +249,30 @@ export async function update(req: Request, res: Response) {
     if (!canAccessUserSettings(req, userId)) {
       return res.status(403).json({ error: 'Доступ запрещен' });
     }
+
+    const existingWeights = await prisma.slotWeight.findUnique({
+      where: { userId }
+    });
+
+    const nextWeights = {
+      wTime: getWeightValue(wTime, existingWeights?.wTime ?? DEFAULT_SLOT_WEIGHTS.wTime),
+      wCompact: getWeightValue(wCompact, existingWeights?.wCompact ?? DEFAULT_SLOT_WEIGHTS.wCompact),
+      wWorkingDay: getWeightValue(wWorkingDay, existingWeights?.wWorkingDay ?? DEFAULT_SLOT_WEIGHTS.wWorkingDay),
+      wPriority: getWeightValue(wPriority, existingWeights?.wPriority ?? DEFAULT_SLOT_WEIGHTS.wPriority),
+      wTravel: getWeightValue(wTravel, existingWeights?.wTravel ?? DEFAULT_SLOT_WEIGHTS.wTravel),
+    };
+
+    if (WEIGHT_KEYS.some((key) => !Number.isFinite(nextWeights[key]))) {
+      return res.status(400).json({
+        error: 'Веса ранжирования должны быть числами'
+      });
+    }
+
+    if (getWeightSum(nextWeights) <= 0) {
+      return res.status(400).json({
+        error: 'Хотя бы один вес ранжирования должен быть больше 0'
+      });
+    }
     
     // Валидация базовых весов
     if (wTime !== undefined && wCompact !== undefined && wWorkingDay !== undefined && wPriority !== undefined && wTravel !== undefined) {
@@ -256,11 +335,7 @@ export async function update(req: Request, res: Response) {
       update: updateData,
       create: {
         userId,
-        wTime: Number(wTime) || 0.3,
-        wCompact: Number(wCompact) || 0.3,
-        wWorkingDay: Number(wWorkingDay) || 0.2,
-        wPriority: Number(wPriority) || 0.2,
-        wTravel: Number(wTravel) || 0.15,
+        ...nextWeights,
         workingDays: workingDays || [1, 2, 3, 4, 5],
         preferredTimes: preferredTimes || {
           morning: { period: 'morning', enabled: false, weight: 0.5 },
@@ -275,6 +350,24 @@ export async function update(req: Request, res: Response) {
     });
     
     console.log('✅ [SlotWeights.update] Веса успешно обновлены');
+
+    await logAuditAction({
+      userId,
+      action: 'slotWeights.update',
+      entity: 'SlotWeight',
+      entityId: weights.id,
+      details: {
+        changedBy: req.userId,
+        weights: {
+          wTime: weights.wTime,
+          wCompact: weights.wCompact,
+          wWorkingDay: weights.wWorkingDay,
+          wPriority: weights.wPriority,
+          wTravel: weights.wTravel,
+        },
+        desiredBreakMinutes: weights.desiredBreakMinutes,
+      },
+    });
     
     res.json(weights);
   } catch (err: any) {
@@ -301,6 +394,16 @@ export async function deleteWeights(req: Request, res: Response) {
     });
     
     console.log('✅ [SlotWeights] Веса успешно удалены');
+
+    await logAuditAction({
+      userId,
+      action: 'slotWeights.delete',
+      entity: 'SlotWeight',
+      entityId: userId,
+      details: {
+        changedBy: req.userId,
+      },
+    });
     
     res.json({ message: 'Веса удалены' });
   } catch (err: any) {
