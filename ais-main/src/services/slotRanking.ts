@@ -45,6 +45,7 @@ export interface RankingConfig {
   minGapMinutes: number;
   maxGapMinutes: number;
   desiredBreakMinutes: number;
+  maxTravelMinutes?: number;
   slotAddress?: string | null;
   userAddress?: string | null;
 }
@@ -74,6 +75,7 @@ export interface TravelLeg {
   travelStatus: TravelLookupStatus;
   availableGapMinutes: number | null;
   desiredBreakMinutes: number;
+  maxTravelMinutes: number;
   score: number;
   explanation: string;
 }
@@ -83,6 +85,7 @@ export interface TravelDetails {
   travelTimeMinutes: number | null;
   availableGapMinutes: number | null;
   desiredBreakMinutes: number;
+  maxTravelMinutes: number;
   explanation: string;
   before?: TravelLeg;
   after?: TravelLeg;
@@ -266,14 +269,28 @@ function findAdjacentLessons(
 function calculateTravelScore(
   availableGapMinutes: number,
   travelTimeMinutes: number | null,
-  desiredBreakMinutes: number
+  desiredBreakMinutes: number,
+  maxTravelMinutes: number
 ): number {
   if (travelTimeMinutes === null) return 0.3;
   if (availableGapMinutes < travelTimeMinutes) return 0;
-  if (desiredBreakMinutes <= 0) return 1;
-  if (availableGapMinutes >= travelTimeMinutes + desiredBreakMinutes) return 1;
 
-  return clamp((availableGapMinutes - travelTimeMinutes) / desiredBreakMinutes);
+  const gapScore = desiredBreakMinutes <= 0 || availableGapMinutes >= travelTimeMinutes + desiredBreakMinutes
+    ? 1
+    : clamp((availableGapMinutes - travelTimeMinutes) / desiredBreakMinutes);
+  const durationScore = calculateTravelDurationScore(travelTimeMinutes, maxTravelMinutes);
+
+  return clamp(gapScore * durationScore);
+}
+
+function calculateTravelDurationScore(
+  travelTimeMinutes: number | null,
+  maxTravelMinutes: number
+): number {
+  if (travelTimeMinutes === null) return 0.3;
+  if (maxTravelMinutes <= 0 || travelTimeMinutes <= maxTravelMinutes) return 1;
+
+  return clamp(Math.pow(maxTravelMinutes / travelTimeMinutes, 2), 0.1, 1);
 }
 
 function explainTravelLeg(
@@ -283,6 +300,7 @@ function explainTravelLeg(
   travelTimeMinutes: number | null,
   travelStatus: TravelLookupStatus,
   desiredBreakMinutes: number,
+  maxTravelMinutes: number,
   score: number,
   hasAddresses: boolean
 ): string {
@@ -313,6 +331,10 @@ function explainTravelLeg(
 
     if (travelStatus === 'same_address') {
       return 'Первое занятие по тому же адресу, дорога не требуется';
+    }
+
+    if (maxTravelMinutes > 0 && travelTimeMinutes > maxTravelMinutes) {
+      return `Первое занятие далеко: дорога около ${travelTimeMinutes} мин, желаемый максимум ${maxTravelMinutes} мин`;
     }
 
     return `Первое занятие: дорога от адреса преподавателя займет около ${travelTimeMinutes} мин`;
@@ -349,6 +371,10 @@ function explainTravelLeg(
     return `Недостаточно времени на дорогу ${label}: окно ${Math.round(availableGapMinutes ?? 0)} мин, дорога ${travelTimeMinutes} мин`;
   }
 
+  if (maxTravelMinutes > 0 && travelTimeMinutes > maxTravelMinutes) {
+    return `Дорога ${label} слишком долгая: ${travelTimeMinutes} мин при желаемом максимуме ${maxTravelMinutes} мин`;
+  }
+
   if (score >= 1) {
     return `Дорога ${label} комфортная: ${travelTimeMinutes} мин и перерыв не меньше ${desiredBreakMinutes} мин`;
   }
@@ -363,6 +389,7 @@ async function buildTravelLeg(
   toAddress: string | null | undefined,
   availableGapMinutes: number | null,
   desiredBreakMinutes: number,
+  maxTravelMinutes: number,
   departureAt: Date
 ): Promise<TravelLeg> {
   const hasAddresses = Boolean(fromAddress?.trim() && toAddress?.trim());
@@ -371,8 +398,8 @@ async function buildTravelLeg(
     : { travelTimeMinutes: null, status: 'missing_address' as TravelLookupStatus };
   const travelTimeMinutes = travelLookup.travelTimeMinutes;
   const score = source === 'user_address'
-    ? (travelTimeMinutes === null ? 0.3 : 1)
-    : calculateTravelScore(availableGapMinutes ?? 0, travelTimeMinutes, desiredBreakMinutes);
+    ? calculateTravelDurationScore(travelTimeMinutes, maxTravelMinutes)
+    : calculateTravelScore(availableGapMinutes ?? 0, travelTimeMinutes, desiredBreakMinutes, maxTravelMinutes);
 
   return {
     direction,
@@ -383,6 +410,7 @@ async function buildTravelLeg(
     travelStatus: travelLookup.status,
     availableGapMinutes: availableGapMinutes === null ? null : Math.round(availableGapMinutes),
     desiredBreakMinutes,
+    maxTravelMinutes,
     score,
     explanation: explainTravelLeg(
       direction,
@@ -391,6 +419,7 @@ async function buildTravelLeg(
       travelTimeMinutes,
       travelLookup.status,
       desiredBreakMinutes,
+      maxTravelMinutes,
       score,
       hasAddresses
     ),
@@ -403,7 +432,8 @@ async function calculateTravelDetails(
   lessons: LessonForRanking[],
   slotAddress: string | null | undefined,
   userAddress: string | null | undefined,
-  desiredBreakMinutes: number
+  desiredBreakMinutes: number,
+  maxTravelMinutes: number
 ): Promise<TravelDetails> {
   const { previous, next } = findAdjacentLessons(slotStart, slotEnd, lessons);
   const legs: TravelLeg[] = [];
@@ -417,6 +447,7 @@ async function calculateTravelDetails(
       slotAddress,
       (slotStart.getTime() - previousEnd.getTime()) / 60000,
       desiredBreakMinutes,
+      maxTravelMinutes,
       previousEnd
     ));
   } else if (userAddress?.trim()) {
@@ -427,6 +458,7 @@ async function calculateTravelDetails(
       slotAddress,
       null,
       desiredBreakMinutes,
+      maxTravelMinutes,
       slotStart
     ));
   }
@@ -439,6 +471,7 @@ async function calculateTravelDetails(
       getBusyItemAddress(next),
       (next.startTime.getTime() - slotEnd.getTime()) / 60000,
       desiredBreakMinutes,
+      maxTravelMinutes,
       slotEnd
     ));
   }
@@ -449,6 +482,7 @@ async function calculateTravelDetails(
       travelTimeMinutes: null,
       availableGapMinutes: null,
       desiredBreakMinutes,
+      maxTravelMinutes,
       explanation: 'Единственное занятие в этот день: дорога между занятиями не ограничивает слот',
     };
   }
@@ -459,6 +493,7 @@ async function calculateTravelDetails(
     travelTimeMinutes: limitingLeg.travelTimeMinutes,
     availableGapMinutes: limitingLeg.availableGapMinutes,
     desiredBreakMinutes,
+    maxTravelMinutes,
     explanation: limitingLeg.explanation,
   };
 
@@ -562,7 +597,8 @@ export async function rankSlots(
       lessons,
       config.slotAddress,
       config.userAddress,
-      Math.max(0, config.desiredBreakMinutes)
+      Math.max(0, config.desiredBreakMinutes),
+      Math.max(0, config.maxTravelMinutes ?? 60)
     );
 
     const breakdown: RankingBreakdown = {

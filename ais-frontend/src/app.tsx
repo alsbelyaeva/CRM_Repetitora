@@ -17,6 +17,7 @@ import Reports from './pages/Reports';
 import Info from './pages/info';
 import AdminClients from './pages/AdminClients';
 import AdminUsers from './pages/AdminUsers';
+import AuditLogs from './pages/AuditLogs';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -85,6 +86,11 @@ function App() {
             <Route path="admin/users" element={
               <AdminRoute>
                 <AdminUsers />
+              </AdminRoute>
+            } />
+            <Route path="admin/audit-logs" element={
+              <AdminRoute>
+                <AuditLogs />
               </AdminRoute>
             } />
           </Route>

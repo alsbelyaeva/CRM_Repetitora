@@ -177,6 +177,8 @@ copy ais-frontend\.env.example ais-frontend\.env
 docker compose up --build
 ```
 
+При запуске через Docker backend автоматически применяет Prisma-миграции перед стартом приложения.
+
 После запуска:
 
 - frontend: `http://localhost:5173`;
@@ -186,7 +188,7 @@ docker compose up --build
 
 ## Миграции и тестовые данные
 
-Применить миграции:
+Если проект запускается без Docker, миграции нужно применить вручную:
 
 ```powershell
 cd ais-main

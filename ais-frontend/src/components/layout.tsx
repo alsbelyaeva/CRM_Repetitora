@@ -13,7 +13,8 @@ import {
   LogOut,
   Info as InfoIcon,
   Menu,
-  X
+  X,
+  ClipboardList
 } from 'lucide-react';
 
 export default function Layout() {
@@ -40,7 +41,8 @@ export default function Layout() {
 
   // Добавляем пункт для администраторов
   const adminMenuItems = [
-    { path: '/admin/users', icon: Users, label: 'Пользователи', adminOnly: true }
+    { path: '/admin/users', icon: Users, label: 'Пользователи', adminOnly: true },
+    { path: '/admin/audit-logs', icon: ClipboardList, label: 'Журнал действий', adminOnly: true }
   ];
 
   const isActivePath = (path: string) => (

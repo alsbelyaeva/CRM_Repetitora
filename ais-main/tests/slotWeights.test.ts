@@ -37,10 +37,12 @@ describe('Slot Weights API', () => {
         wPriority: 0.1,
         wTravel: 0.15,
         desiredBreakMinutes: 45,
+        maxTravelMinutes: 90,
       });
 
     expect(res.status).toBe(200);
     expect(res.body.desiredBreakMinutes).toBe(45);
+    expect(res.body.maxTravelMinutes).toBe(90);
   });
 
   it('PUT /api/slot-weights/:userId отклоняет нулевую сумму весов ранжирования', async () => {
@@ -57,6 +59,18 @@ describe('Slot Weights API', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toContain('больше 0');
+  });
+
+  it('PUT /api/slot-weights/:userId отклоняет отрицательное максимальное время дороги', async () => {
+    const res = await request(app)
+      .put(`/api/slot-weights/${seed.teacher.id}`)
+      .set(authHeader(seed.teacher))
+      .send({
+        maxTravelMinutes: -1,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('maxTravelMinutes');
   });
 
   it('GET /api/slot-weights возвращает все веса только администратору', async () => {

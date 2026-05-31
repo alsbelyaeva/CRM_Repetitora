@@ -207,6 +207,7 @@ model SlotWeight {
   createdAt      DateTime @default(now()) @map("created_at")
   gapImportance  Float    @default(0.5) @map("gap_importance")
   maxGapMinutes  Int      @default(180) @map("max_gap_minutes")
+  maxTravelMinutes Int    @default(60) @map("max_travel_minutes")
   minGapMinutes  Int      @default(60) @map("min_gap_minutes")
   preferredTimes Json     @default("{}") @map("preferred_times")
   updatedAt      DateTime @updatedAt @map("updated_at")

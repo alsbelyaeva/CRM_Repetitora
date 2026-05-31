@@ -2,7 +2,6 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
 import { API_URL } from '../utils/apiBase';
 
 // ✅ Добавляем API_URL
@@ -21,39 +20,8 @@ export default function Login() {
     setLoading(true);
 
     try {
-      console.log('🚀 Отправка логина на:', `${API_URL}/api/auth/login`);
-      
-      // ✅ Непосредственный запрос для отладки
-      const response = await axios.post(`${API_URL}/api/auth/login`, {
-        email,
-        password
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 10000,
-      });
-
-      console.log('✅ Логин успешен:', response.data);
-
-      if (response.data.token && response.data.user) {
-        // Сохраняем данные
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        
-        // Настраиваем axios для будущих запросов
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-        
-        // Обновляем состояние авторизации
-        if (login) {
-          await login(email, password);
-        }
-        
-        console.log('✅ Авторизация успешна, перенаправление...');
-        navigate('/', { replace: true });
-      } else {
-        throw new Error('Токен или данные пользователя не получены');
-      }
+      await login(email, password);
+      navigate('/', { replace: true });
     } catch (err: any) {
       console.error('❌ Ошибка логина:', err);
       

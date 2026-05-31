@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prismaClient';
+import { getChangedFields, logAuditAction } from '../services/auditLogService';
 
 // Создать оплату
 export const create = async (req: Request, res: Response) => {
@@ -92,6 +93,21 @@ export const create = async (req: Request, res: Response) => {
     });
     
     console.log(`✅ Платеж создан: ${payment.id} для клиента ${client.fullName} (создатель: ${userId}, роль: ${userRole})`);
+
+    await logAuditAction({
+      userId: payment.client.userId,
+      action: 'payment.create',
+      entity: 'Payment',
+      entityId: payment.id,
+      details: {
+        clientId: payment.clientId,
+        clientName: payment.client.fullName,
+        lessonId: payment.lessonId,
+        amount: Number(payment.amount),
+        method: payment.method,
+        createdBy: userId,
+      },
+    });
     
     res.status(201).json({ 
       ...payment, 
@@ -330,6 +346,24 @@ export const update = async (req: Request, res: Response) => {
 
     console.log(`✅ Платеж ${id} обновлен пользователем ${userId} (роль: ${userRole})`);
 
+    await logAuditAction({
+      userId: updated.client.userId,
+      action: 'payment.update',
+      entity: 'Payment',
+      entityId: updated.id,
+      details: {
+        clientId: updated.clientId,
+        lessonId: updated.lessonId,
+        changedBy: userId,
+        changedFields: getChangedFields(existingPayment as any, updated as any, [
+          'amount',
+          'dateTime',
+          'method',
+          'notes',
+        ]),
+      },
+    });
+
     res.json({
       ...updated,
       amount: Number(updated.amount)
@@ -383,6 +417,19 @@ export const remove = async (req: Request, res: Response) => {
     await prisma.payment.delete({ where: { id } });
     
     console.log(`✅ Платеж ${id} удален пользователем ${userId} (роль: ${userRole})`);
+
+    await logAuditAction({
+      userId: payment.client.userId,
+      action: 'payment.delete',
+      entity: 'Payment',
+      entityId: id,
+      details: {
+        clientId: payment.clientId,
+        lessonId: payment.lessonId,
+        amount: Number(payment.amount),
+        deletedBy: userId,
+      },
+    });
     
     res.status(200).json({ message: 'Оплата удалена' });
   } catch (err: any) {

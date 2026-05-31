@@ -23,8 +23,8 @@ describe('Slot Requests API', () => {
       .send({
         clientId: seed.client.id,
         proposedSlots: [
-          { from: '2026-05-14T10:00:00+03:00', to: '2026-05-14T11:00:00+03:00' },
-          { from: '2026-05-14T12:00:00+03:00', to: '2026-05-14T13:00:00+03:00' },
+          { from: '2026-06-14T10:00:00+03:00', to: '2026-06-14T11:00:00+03:00' },
+          { from: '2026-06-14T12:00:00+03:00', to: '2026-06-14T13:00:00+03:00' },
         ],
       });
 
@@ -49,7 +49,7 @@ describe('Slot Requests API', () => {
       where: { id: seed.slotRequest.id },
       data: {
         status: 'CANCELLED',
-        proposedSlots: [{ from: '2026-05-11T12:00:00+03:00', to: '2026-05-11T13:00:00+03:00', status: 'CANCELLED' }],
+        proposedSlots: [{ from: '2026-06-11T12:00:00+03:00', to: '2026-06-11T13:00:00+03:00', status: 'CANCELLED' }],
       },
     });
 

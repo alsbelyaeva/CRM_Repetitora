@@ -1,5 +1,6 @@
 import prisma from '../utils/prismaClient';
 import { telegramNotificationService, TelegramUpdate } from './TelegramNotificationService';
+import { logAuditAction } from './auditLogService';
 
 let pollingStarted = false;
 let pollingStopped = false;
@@ -80,6 +81,15 @@ async function handleStartCommand(update: TelegramUpdate) {
     });
 
     console.log(`[Telegram] Подключен преподаватель ${user.id} к chat_id=${telegramChatId}`);
+    await logAuditAction({
+      userId: user.id,
+      action: 'telegram.connect',
+      entity: 'User',
+      entityId: user.id,
+      details: {
+        target: 'teacher',
+      },
+    });
     await telegramNotificationService.sendMessage(telegramChatId, 'Telegram подключен к аккаунту преподавателя.');
     return;
   }
@@ -94,7 +104,7 @@ async function handleStartCommand(update: TelegramUpdate) {
   const client = await prisma.client.update({
     where: { id: clientId },
     data: { telegramChatId },
-    select: { id: true, fullName: true },
+    select: { id: true, fullName: true, userId: true },
   }).catch(() => null);
 
   if (!client) {
@@ -104,6 +114,16 @@ async function handleStartCommand(update: TelegramUpdate) {
   }
 
   console.log(`[Telegram] Подключен клиент ${client.id} к chat_id=${telegramChatId}`);
+  await logAuditAction({
+    userId: client.userId,
+    action: 'telegram.connect',
+    entity: 'Client',
+    entityId: client.id,
+    details: {
+      target: 'client',
+      clientName: client.fullName,
+    },
+  });
   await telegramNotificationService.sendMessage(telegramChatId, 'Telegram подключен к карточке клиента.');
 }
 

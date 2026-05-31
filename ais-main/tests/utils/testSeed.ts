@@ -119,6 +119,7 @@ export async function seedTestData() {
       minGapMinutes: 30,
       maxGapMinutes: 180,
       desiredBreakMinutes: 30,
+      maxTravelMinutes: 60,
       gapImportance: 0.5,
     },
   });

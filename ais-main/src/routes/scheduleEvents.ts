@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../utils/prismaClient';
 import { authMiddleware } from '../middleware/auth';
+import { getChangedFields, logAuditAction } from '../services/auditLogService';
 
 const router = Router();
 
@@ -192,6 +193,21 @@ router.post('/', async (req, res) => {
       },
     });
 
+    await logAuditAction({
+      userId: event.userId,
+      action: 'scheduleEvent.create',
+      entity: 'ScheduleEvent',
+      entityId: event.id,
+      details: {
+        title: event.title,
+        type: event.type,
+        status: event.status,
+        startTime: event.startTime,
+        durationMin: event.durationMin,
+        createdBy: user.id,
+      },
+    });
+
     res.status(201).json(event);
   } catch (error: any) {
     console.error('Ошибка создания события расписания:', error);
@@ -238,6 +254,26 @@ router.put('/:id', async (req, res) => {
       data: parsed,
     });
 
+    await logAuditAction({
+      userId: event.userId,
+      action: 'scheduleEvent.update',
+      entity: 'ScheduleEvent',
+      entityId: event.id,
+      details: {
+        title: event.title,
+        changedBy: user.id,
+        changedFields: getChangedFields(existing as any, event as any, [
+          'title',
+          'startTime',
+          'durationMin',
+          'type',
+          'status',
+          'location',
+          'notes',
+        ]),
+      },
+    });
+
     res.json(event);
   } catch (error: any) {
     console.error('Ошибка обновления события расписания:', error);
@@ -274,6 +310,23 @@ router.patch('/:id/status', async (req, res) => {
       data: { status },
     });
 
+    await logAuditAction({
+      userId: event.userId,
+      action: existing.status === 'CANCELLED' && status === 'ACTIVE'
+        ? 'scheduleEvent.restore'
+        : status === 'CANCELLED'
+          ? 'scheduleEvent.cancel'
+          : 'scheduleEvent.status.update',
+      entity: 'ScheduleEvent',
+      entityId: event.id,
+      details: {
+        title: event.title,
+        oldStatus: existing.status,
+        newStatus: event.status,
+        changedBy: user.id,
+      },
+    });
+
     res.json(event);
   } catch (error: any) {
     console.error('Ошибка изменения статуса события:', error);
@@ -293,6 +346,18 @@ router.delete('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Событие не найдено' });
 
     await prisma.scheduleEvent.delete({ where: { id } });
+
+    await logAuditAction({
+      userId: existing.userId,
+      action: 'scheduleEvent.delete',
+      entity: 'ScheduleEvent',
+      entityId: existing.id,
+      details: {
+        title: existing.title,
+        deletedBy: user.id,
+      },
+    });
+
     res.json({ message: 'Событие удалено' });
   } catch (error: any) {
     console.error('Ошибка удаления события расписания:', error);

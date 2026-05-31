@@ -88,6 +88,7 @@ export async function rankSlots(req: Request, res: Response) {
           minGapMinutes: 60,
           maxGapMinutes: 180,
           desiredBreakMinutes: 30,
+          maxTravelMinutes: 60,
           gapImportance: 0.5,
         },
       });
@@ -170,6 +171,7 @@ export async function rankSlots(req: Request, res: Response) {
         minGapMinutes: weights.minGapMinutes || 60,
         maxGapMinutes: weights.maxGapMinutes || 180,
         desiredBreakMinutes: weights.desiredBreakMinutes || 30,
+        maxTravelMinutes: weights.maxTravelMinutes ?? 60,
         slotAddress: client.address,
         userAddress: teacher?.address,
       },
@@ -189,6 +191,7 @@ export async function rankSlots(req: Request, res: Response) {
         minGapMinutes: weights.minGapMinutes,
         maxGapMinutes: weights.maxGapMinutes,
         desiredBreakMinutes: weights.desiredBreakMinutes,
+        maxTravelMinutes: weights.maxTravelMinutes,
         gapImportance: weights.gapImportance,
       },
       clientVip: client.vip,

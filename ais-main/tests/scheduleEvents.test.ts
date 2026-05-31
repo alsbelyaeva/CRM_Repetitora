@@ -22,7 +22,7 @@ describe('Schedule Events API', () => {
       .set(authHeader(seed.teacher))
       .send({
         title: 'Личное дело',
-        startTime: '2026-05-13T15:00:00+03:00',
+        startTime: '2026-06-13T15:00:00+03:00',
         durationMin: 45,
         type: 'PERSONAL',
         location: 'Уфа, улица Мира, 1',
@@ -40,7 +40,7 @@ describe('Schedule Events API', () => {
       .set(authHeader(seed.teacher))
       .send({
         title: 'Конфликтное событие',
-        startTime: '2026-05-11T10:30:00+03:00',
+        startTime: '2026-06-11T10:30:00+03:00',
         durationMin: 30,
         type: 'PERSONAL',
       });

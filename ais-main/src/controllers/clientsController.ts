@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prismaClient';
+import { getChangedFields, logAuditAction } from '../services/auditLogService';
 
 export async function getAll(req: Request, res: Response) {
   try {
@@ -283,6 +284,19 @@ export async function create(req: Request, res: Response) {
     });
     
     console.log(`✅ [Clients.create] Клиент создан с ID: ${client.id} для преподавателя ${targetUserId}`);
+
+    await logAuditAction({
+      userId: targetUserId,
+      action: 'client.create',
+      entity: 'Client',
+      entityId: client.id,
+      details: {
+        clientName: client.fullName,
+        createdBy: userId,
+        assignedTeacherId: targetUserId,
+        vip: client.vip,
+      },
+    });
     
     res.status(201).json(client);
   } catch (error: any) {
@@ -405,6 +419,27 @@ export async function update(req: Request, res: Response) {
     });
 
     console.log(`✅ Клиент ${id} обновлен пользователем ${userId} (роль: ${userRole})`);
+
+    await logAuditAction({
+      userId: updated.userId,
+      action: 'client.update',
+      entity: 'Client',
+      entityId: updated.id,
+      details: {
+        clientName: updated.fullName,
+        changedBy: userId,
+        changedFields: getChangedFields(existingClient as any, updated as any, [
+          'fullName',
+          'address',
+          'email',
+          'phone',
+          'notes',
+          'vip',
+          'tags',
+          'userId',
+        ]),
+      },
+    });
     
     res.json(updated);
   } catch (error: any) {
@@ -455,6 +490,17 @@ export async function softDelete(req: Request, res: Response) {
     });
     
     console.log(`✅ Клиент ${id} помечен как удаленный пользователем ${userId} (роль: ${userRole})`);
+
+    await logAuditAction({
+      userId: existingClient.userId,
+      action: 'client.delete',
+      entity: 'Client',
+      entityId: existingClient.id,
+      details: {
+        clientName: existingClient.fullName,
+        deletedBy: userId,
+      },
+    });
     
     res.json({ message: 'Клиент помечен как удалён' });
   } catch (error: any) {

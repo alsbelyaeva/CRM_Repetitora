@@ -64,6 +64,7 @@ interface TravelLegDetails {
   travelStatus?: string;
   availableGapMinutes: number | null;
   desiredBreakMinutes?: number;
+  maxTravelMinutes?: number;
   score: number;
   explanation?: string;
 }
@@ -73,6 +74,7 @@ interface TravelDetails {
   travelTimeMinutes: number | null;
   availableGapMinutes: number | null;
   desiredBreakMinutes?: number;
+  maxTravelMinutes?: number;
   explanation?: string;
   before?: TravelLegDetails;
   after?: TravelLegDetails;
@@ -371,8 +373,14 @@ function isTightUnverifiedTravelLeg(leg?: TravelLegDetails | null) {
   return Number(leg.availableGapMinutes) < desiredBreak;
 }
 
+function isTooLongTravelLeg(leg?: TravelLegDetails | null) {
+  if (!leg || leg.travelTimeMinutes === null) return false;
+  const maxTravel = Number(leg.maxTravelMinutes ?? 0);
+  return maxTravel > 0 && Number(leg.travelTimeMinutes) > maxTravel;
+}
+
 function isCriticalTravelLeg(leg?: TravelLegDetails | null) {
-  return isImpossibleTravelLeg(leg) || isTightUnverifiedTravelLeg(leg);
+  return isImpossibleTravelLeg(leg) || isTightUnverifiedTravelLeg(leg) || isTooLongTravelLeg(leg);
 }
 
 function hasImpossibleTravel(slot: RankedSlot) {
@@ -419,6 +427,10 @@ function formatTravelLeg(leg: TravelLegDetails) {
     }
 
     if (travel !== null) {
+      if (isTooLongTravelLeg(leg)) {
+        return leg.explanation || `Первое занятие в этот день: дорога от адреса преподавателя около ${travel} мин, это дольше желаемого максимума.`;
+      }
+
       return `Первое занятие в этот день: дорога от адреса преподавателя около ${travel} мин.`;
     }
 
@@ -437,6 +449,10 @@ function formatTravelLeg(leg: TravelLegDetails) {
 
   if (isTightUnverifiedTravelLeg(leg)) {
     return `${label}: между занятиями только ${gap} мин, маршрут не рассчитан. Вы можете не успеть добраться.`;
+  }
+
+  if (isTooLongTravelLeg(leg)) {
+    return leg.explanation || `${label}: дорога ${travel} мин, это дольше желаемого максимума.`;
   }
 
   if (travel !== null && gap !== null) {
@@ -467,6 +483,10 @@ function getTravelCardDetail(slot: RankedSlot) {
     }
 
     if (travel !== null && travel !== undefined) {
+      if (isTooLongTravelLeg(userAddressLeg)) {
+        return `${onlyLessonText} От адреса преподавателя до клиента: около ${travel} мин, это дольше желаемого максимума ${userAddressLeg?.maxTravelMinutes} мин.`;
+      }
+
       return `${onlyLessonText} От адреса преподавателя до клиента: около ${travel} мин.`;
     }
 

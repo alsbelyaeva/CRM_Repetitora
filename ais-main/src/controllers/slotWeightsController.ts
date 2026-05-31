@@ -14,6 +14,8 @@ const DEFAULT_SLOT_WEIGHTS = {
   wTravel: 0.15,
 };
 
+const DEFAULT_MAX_TRAVEL_MINUTES = 60;
+
 const WEIGHT_KEYS = ['wTime', 'wCompact', 'wWorkingDay', 'wPriority', 'wTravel'] as const;
 
 function numberOrDefault(value: unknown, fallback: number) {
@@ -68,7 +70,7 @@ export async function getAll(req: Request, res: Response) {
 // Создать веса
 export async function create(req: Request, res: Response) {
   try {
-    const { userId, wTime, wCompact, wWorkingDay, wPriority, wTravel, workingDays, preferredTimes, minGapMinutes, maxGapMinutes, desiredBreakMinutes, gapImportance } = req.body;
+    const { userId, wTime, wCompact, wWorkingDay, wPriority, wTravel, workingDays, preferredTimes, minGapMinutes, maxGapMinutes, desiredBreakMinutes, maxTravelMinutes, gapImportance } = req.body;
     
     console.log('➕ [SlotWeights] Создание весов для пользователя:', userId);
     
@@ -117,6 +119,12 @@ export async function create(req: Request, res: Response) {
         error: 'Хотя бы один вес ранжирования должен быть больше 0',
       });
     }
+
+    if (maxTravelMinutes !== undefined && Number(maxTravelMinutes) < 0) {
+      return res.status(400).json({
+        error: 'maxTravelMinutes не может быть отрицательным',
+      });
+    }
     
     const weights = await prisma.slotWeight.create({
       data: {
@@ -128,10 +136,11 @@ export async function create(req: Request, res: Response) {
           day: { period: 'day', enabled: true, weight: 0.7 },
           evening: { period: 'evening', enabled: false, weight: 0.5 }
         },
-        minGapMinutes: Number(minGapMinutes) || 60,
-        maxGapMinutes: Number(maxGapMinutes) || 180,
-        desiredBreakMinutes: Number(desiredBreakMinutes) || 30,
-        gapImportance: Number(gapImportance) || 0.5
+        minGapMinutes: numberOrDefault(minGapMinutes, 60),
+        maxGapMinutes: numberOrDefault(maxGapMinutes, 180),
+        desiredBreakMinutes: numberOrDefault(desiredBreakMinutes, 30),
+        maxTravelMinutes: numberOrDefault(maxTravelMinutes, DEFAULT_MAX_TRAVEL_MINUTES),
+        gapImportance: numberOrDefault(gapImportance, 0.5)
       }
     });
     
@@ -198,6 +207,7 @@ export async function getByUser(req: Request, res: Response) {
           minGapMinutes: 60,
           maxGapMinutes: 180,
           desiredBreakMinutes: 30,
+          maxTravelMinutes: DEFAULT_MAX_TRAVEL_MINUTES,
           gapImportance: 0.5
         }
       });
@@ -228,6 +238,7 @@ export async function update(req: Request, res: Response) {
       minGapMinutes, 
       maxGapMinutes, 
       desiredBreakMinutes,
+      maxTravelMinutes,
       gapImportance 
     } = req.body;
     
@@ -243,6 +254,7 @@ export async function update(req: Request, res: Response) {
       minGapMinutes,
       maxGapMinutes,
       desiredBreakMinutes,
+      maxTravelMinutes,
       gapImportance
     });
 
@@ -311,6 +323,12 @@ export async function update(req: Request, res: Response) {
         error: 'desiredBreakMinutes не может быть отрицательным'
       });
     }
+
+    if (maxTravelMinutes !== undefined && Number(maxTravelMinutes) < 0) {
+      return res.status(400).json({
+        error: 'maxTravelMinutes не может быть отрицательным'
+      });
+    }
     
     // Подготавливаем данные для обновления
     const updateData: any = {};
@@ -325,6 +343,7 @@ export async function update(req: Request, res: Response) {
     if (minGapMinutes !== undefined) updateData.minGapMinutes = Number(minGapMinutes);
     if (maxGapMinutes !== undefined) updateData.maxGapMinutes = Number(maxGapMinutes);
     if (desiredBreakMinutes !== undefined) updateData.desiredBreakMinutes = Number(desiredBreakMinutes);
+    if (maxTravelMinutes !== undefined) updateData.maxTravelMinutes = Number(maxTravelMinutes);
     if (gapImportance !== undefined) updateData.gapImportance = Number(gapImportance);
     
     updateData.updatedAt = new Date();
@@ -342,10 +361,11 @@ export async function update(req: Request, res: Response) {
           day: { period: 'day', enabled: true, weight: 0.7 },
           evening: { period: 'evening', enabled: false, weight: 0.5 }
         },
-        minGapMinutes: Number(minGapMinutes) || 60,
-        maxGapMinutes: Number(maxGapMinutes) || 180,
-        desiredBreakMinutes: Number(desiredBreakMinutes) || 30,
-        gapImportance: Number(gapImportance) || 0.5
+        minGapMinutes: numberOrDefault(minGapMinutes, 60),
+        maxGapMinutes: numberOrDefault(maxGapMinutes, 180),
+        desiredBreakMinutes: numberOrDefault(desiredBreakMinutes, 30),
+        maxTravelMinutes: numberOrDefault(maxTravelMinutes, DEFAULT_MAX_TRAVEL_MINUTES),
+        gapImportance: numberOrDefault(gapImportance, 0.5)
       }
     });
     
@@ -366,6 +386,7 @@ export async function update(req: Request, res: Response) {
           wTravel: weights.wTravel,
         },
         desiredBreakMinutes: weights.desiredBreakMinutes,
+        maxTravelMinutes: weights.maxTravelMinutes,
       },
     });
     

@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { getPasswordPolicyError } from '../utils/passwordPolicy';
 import { sendPasswordResetEmail } from '../services/mailService';
+import { logAuditAction } from '../services/auditLogService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-change-me';
 const PASSWORD_RESET_TTL_MINUTES = 30;
@@ -85,6 +86,16 @@ export async function register(req: Request, res: Response) {
     );
 
     console.log(`✅ [Auth.register] Пользователь создан: ${user.email} (ID: ${user.id})`);
+
+    await logAuditAction({
+      userId: user.id,
+      action: 'auth.register',
+      entity: 'User',
+      entityId: user.id,
+      details: {
+        role: user.role,
+      },
+    });
 
     res.status(201).json({
       token,
@@ -238,6 +249,16 @@ export async function forgotPassword(req: Request, res: Response) {
 
     await sendPasswordResetEmail(user.email, resetUrl);
 
+    await logAuditAction({
+      userId: user.id,
+      action: 'auth.passwordReset.request',
+      entity: 'User',
+      entityId: user.id,
+      details: {
+        deliveryAttempted: true,
+      },
+    });
+
     return res.json(PASSWORD_RESET_RESPONSE);
   } catch (err: any) {
     console.error('❌ [Auth.forgotPassword] Ошибка запроса сброса пароля:', err);
@@ -315,6 +336,16 @@ export async function resetPassword(req: Request, res: Response) {
         data: { usedAt },
       }),
     ]);
+
+    await logAuditAction({
+      userId: resetToken.user.id,
+      action: 'auth.passwordReset.complete',
+      entity: 'User',
+      entityId: resetToken.user.id,
+      details: {
+        completedAt: usedAt,
+      },
+    });
 
     return res.json({ message: 'Пароль успешно изменен. Теперь можно войти с новым паролем.' });
   } catch (err: any) {
@@ -426,6 +457,16 @@ export async function changePassword(req: Request, res: Response) {
     await prisma.user.update({
       where: { id: user.id },
       data: { passwordHash },
+    });
+
+    await logAuditAction({
+      userId: user.id,
+      action: 'auth.password.change',
+      entity: 'User',
+      entityId: user.id,
+      details: {
+        changedBy: user.id,
+      },
     });
 
     res.json({ message: 'Пароль успешно изменен' });

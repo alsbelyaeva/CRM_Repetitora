@@ -28,6 +28,7 @@ interface Weights {
   minGapMinutes: number;
   maxGapMinutes: number;
   desiredBreakMinutes: number;
+  maxTravelMinutes: number;
   gapImportance: number;
 }
 
@@ -49,6 +50,7 @@ const DEFAULT_WEIGHTS: Weights = {
   minGapMinutes: 60,
   maxGapMinutes: 180,
   desiredBreakMinutes: 30,
+  maxTravelMinutes: 60,
   gapImportance: 0.5,
 };
 
@@ -188,6 +190,7 @@ export default function Settings() {
           minGapMinutes: response.data.minGapMinutes || DEFAULT_WEIGHTS.minGapMinutes,
           maxGapMinutes: response.data.maxGapMinutes || DEFAULT_WEIGHTS.maxGapMinutes,
           desiredBreakMinutes: response.data.desiredBreakMinutes ?? DEFAULT_WEIGHTS.desiredBreakMinutes,
+          maxTravelMinutes: response.data.maxTravelMinutes ?? DEFAULT_WEIGHTS.maxTravelMinutes,
           gapImportance: response.data.gapImportance || DEFAULT_WEIGHTS.gapImportance,
         });
       }
@@ -866,7 +869,7 @@ export default function Settings() {
 
             <div>
               <label className="block text-sm font-semibold mb-2">
-                Максимальный удачный промежуток: {formatGapTime(weights.maxGapMinutes)}
+                Максимальный комфортный промежуток: {formatGapTime(weights.maxGapMinutes)}
               </label>
               <select
                 value={weights.maxGapMinutes}
@@ -882,6 +885,26 @@ export default function Settings() {
                 <option value="480">8 часов</option>
                 <option value="720">12 часов</option>
                 <option value="1440">24 часа</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-2">
+                Желаемый максимум дороги: {weights.maxTravelMinutes === 0 ? 'не ограничивать' : formatGapTime(weights.maxTravelMinutes)}
+              </label>
+              <select
+                value={weights.maxTravelMinutes}
+                onChange={(e) => setWeights({ ...weights, maxTravelMinutes: Number(e.target.value) })}
+                className="w-full px-4 py-3 md:py-2 border rounded-lg bg-white"
+              >
+                <option value="0">Не ограничивать</option>
+                <option value="15">15 минут</option>
+                <option value="30">30 минут</option>
+                <option value="45">45 минут</option>
+                <option value="60">1 час</option>
+                <option value="90">1.5 часа</option>
+                <option value="120">2 часа</option>
+                <option value="180">3 часа</option>
               </select>
             </div>
           </div>

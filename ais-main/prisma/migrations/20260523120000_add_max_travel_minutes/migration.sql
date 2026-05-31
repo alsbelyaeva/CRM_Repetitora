@@ -1,0 +1,2 @@
+ALTER TABLE "SlotWeight"
+ADD COLUMN "max_travel_minutes" INTEGER NOT NULL DEFAULT 60;
