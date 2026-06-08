@@ -8,35 +8,50 @@ async function hashPassword(password: string) {
 }
 
 async function main() {
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@ais.local';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123';
+  const teacherEmail = process.env.SEED_TEACHER_EMAIL || 'teacher@ais.local';
+  const teacherPassword = process.env.SEED_TEACHER_PASSWORD || 'Teacher123';
+
   console.log('🧹 Очистка базы данных...');
 
   await prisma.auditLog.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.telegramNotificationLog.deleteMany();
+  await prisma.emailVerificationToken.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
   await prisma.payment.deleteMany();
+  await prisma.lessonParticipant.deleteMany();
   await prisma.lesson.deleteMany();
+  await prisma.recurringSeries.deleteMany();
+  await prisma.scheduleEvent.deleteMany();
   await prisma.slotRequest.deleteMany();
   await prisma.client.deleteMany();
   await prisma.slotWeight.deleteMany();
   await prisma.user.deleteMany();
 
   console.log('👤 Создание пользователей...');
+  const verifiedAt = new Date();
 
   const admin = await prisma.user.create({
     data: {
-      email: 'admin@ais.local',
-      passwordHash: await hashPassword('Admin123'),
+      email: adminEmail,
+      passwordHash: await hashPassword(adminPassword),
       fullName: 'Администратор системы',
       address: 'Москва, Тверская улица, 1',
       role: UserRole.ADMIN,
+      emailVerifiedAt: verifiedAt,
     },
   });
 
   const teacher1 = await prisma.user.create({
     data: {
-      email: 'teacher1@ais.local',
-      passwordHash: await hashPassword('Teacher123'),
+      email: teacherEmail,
+      passwordHash: await hashPassword(teacherPassword),
       fullName: 'Анна Иванова',
       address: 'Москва, Лесная улица, 20',
       role: UserRole.TEACHER,
+      emailVerifiedAt: verifiedAt,
     },
   });
 
@@ -47,7 +62,49 @@ async function main() {
       fullName: 'Сергей Петров',
       address: 'Москва, Большая Никитская улица, 22',
       role: UserRole.TEACHER,
+      emailVerifiedAt: verifiedAt,
     },
+  });
+
+  await prisma.slotWeight.createMany({
+    data: [
+      {
+        userId: teacher1.id,
+        wTime: 0.35,
+        wCompact: 0.25,
+        wWorkingDay: 0.2,
+        wPriority: 0.2,
+        wTravel: 0.25,
+        minGapMinutes: 60,
+        desiredBreakMinutes: 30,
+        maxGapMinutes: 180,
+        maxTravelMinutes: 60,
+        workingDays: [1, 2, 3, 4, 5],
+        preferredTimes: {
+          morning: { enabled: true, score: 0.6 },
+          afternoon: { enabled: true, score: 0.9 },
+          evening: { enabled: true, score: 0.7 },
+        },
+      },
+      {
+        userId: teacher2.id,
+        wTime: 0.25,
+        wCompact: 0.3,
+        wWorkingDay: 0.2,
+        wPriority: 0.15,
+        wTravel: 0.25,
+        minGapMinutes: 30,
+        desiredBreakMinutes: 30,
+        maxGapMinutes: 180,
+        maxTravelMinutes: 45,
+        workingDays: [1, 2, 3, 4, 5, 6],
+        preferredTimes: {
+          morning: { enabled: true, score: 0.4 },
+          afternoon: { enabled: true, score: 0.8 },
+          evening: { enabled: true, score: 0.9 },
+        },
+      },
+    ],
   });
 
   // --- Даты для занятий ---
@@ -103,6 +160,8 @@ async function main() {
   });
 
   console.log('✅ Сиды успешно загружены');
+  console.log(`Демо-вход администратора: ${adminEmail} / ${adminPassword}`);
+  console.log(`Демо-вход преподавателя: ${teacherEmail} / ${teacherPassword}`);
 }
 
 main()

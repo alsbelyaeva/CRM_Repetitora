@@ -130,14 +130,15 @@ ais-system/
 
 Реальные `.env`-файлы не добавляются в Git. Для настройки используются шаблоны:
 
+- `.env.example` в корне проекта для Docker-развертывания;
 - `ais-main/.env.example`;
 - `ais-frontend/.env.example`.
 
-Основные переменные серверной части:
+Основные переменные для Docker-развертывания:
 
 ```env
-DATABASE_URL=postgresql://ais_user:ais_password@localhost:5432/ais_db?schema=public
-JWT_SECRET=change_me
+DATABASE_URL=postgresql://ais_user:ais_password@db:5432/ais_db
+JWT_SECRET=change_me_to_long_random_value
 PORT=4000
 FRONTEND_URL=http://localhost:5173
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
@@ -152,12 +153,9 @@ SMTP_FROM=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_USERNAME=
 TWO_GIS_API_KEY=
-```
 
-Основная переменная клиентской части:
-
-```env
-VITE_API_URL=http://localhost:4000
+VITE_API_URL=
+VITE_PROXY_TARGET=http://backend:4000
 ```
 
 ## Запуск через Docker
@@ -165,11 +163,10 @@ VITE_API_URL=http://localhost:4000
 1. Скопировать шаблоны переменных окружения:
 
 ```powershell
-copy ais-main\.env.example ais-main\.env
-copy ais-frontend\.env.example ais-frontend\.env
+copy .env.example .env
 ```
 
-2. При необходимости указать ключи SMTP, Telegram и 2GIS в `.env`.
+2. Указать в `.env` реальные значения `JWT_SECRET`, SMTP, Telegram и 2GIS.
 
 3. Запустить проект:
 
@@ -177,7 +174,7 @@ copy ais-frontend\.env.example ais-frontend\.env
 docker compose up --build
 ```
 
-При запуске через Docker backend автоматически применяет Prisma-миграции перед стартом приложения.
+При запуске через Docker backend автоматически применяет Prisma-миграции перед стартом приложения. Если для локальной разработки уже есть `ais-main/.env`, Docker тоже подхватит его значения, но корневой `.env` считается основным файлом для развертывания.
 
 После запуска:
 
@@ -202,6 +199,21 @@ npm run seed
 ```
 
 В seed создаются учетные записи администратора, преподавателей, клиентов и демонстрационные данные для проверки функций.
+
+Для Docker-запуска seed можно применить после старта контейнеров:
+
+```powershell
+docker compose exec backend npm run seed
+```
+
+Демонстрационные учетные записи по умолчанию:
+
+| Роль | Email | Пароль |
+| --- | --- | --- |
+| Администратор | `admin@ais.local` | `Admin123` |
+| Преподаватель | `teacher@ais.local` | `Teacher123` |
+
+Email у демонстрационных пользователей считается подтвержденным. При необходимости логины и пароли seed можно переопределить переменными `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_TEACHER_EMAIL`, `SEED_TEACHER_PASSWORD`.
 
 ## Команды разработки
 
