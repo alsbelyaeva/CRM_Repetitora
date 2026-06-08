@@ -48,7 +48,7 @@ describe('Auth API', () => {
     expect(res.body.user).not.toHaveProperty('passwordHash');
   });
 
-  it('POST /api/auth/forgot-password без SMTP не раскрывает наличие email и не падает', async () => {
+  it('POST /api/auth/forgot-password точно сообщает, найден email и отправлено ли письмо', async () => {
     await withoutEnv(['SMTP_HOST', 'SMTP_PORT', 'SMTP_FROM', 'SMTP_USER', 'SMTP_PASSWORD'], async () => {
       const existing = await request(app)
         .post('/api/auth/forgot-password')
@@ -58,9 +58,15 @@ describe('Auth API', () => {
         .post('/api/auth/forgot-password')
         .send({ email: 'missing@example.com' });
 
-      expect(existing.status).toBe(200);
-      expect(missing.status).toBe(200);
-      expect(existing.body).toEqual(missing.body);
+      expect(existing.status).toBe(503);
+      expect(existing.body.emailFound).toBe(true);
+      expect(existing.body.emailSent).toBe(false);
+      expect(existing.body.error).toMatch(/SMTP|Письмо не отправлено/);
+
+      expect(missing.status).toBe(404);
+      expect(missing.body.emailFound).toBe(false);
+      expect(missing.body.emailSent).toBe(false);
+      expect(missing.body.error).toMatch(/не найден/);
     });
   });
 

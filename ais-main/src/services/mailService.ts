@@ -155,20 +155,39 @@ async function sendSmtpMail(config: SmtpConfig, to: string, resetUrl: string) {
   }
 }
 
-export async function sendPasswordResetEmail(to: string, resetUrl: string) {
+export type PasswordResetEmailResult =
+  | { success: true; skipped: false }
+  | { success: false; skipped: true; reason: 'smtp_not_configured' }
+  | { success: false; skipped: false; reason: 'smtp_error'; error: string };
+
+export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<PasswordResetEmailResult> {
   const config = getSmtpConfig();
 
   if (!config) {
     if (process.env.NODE_ENV !== 'production') {
       console.log(`[Password reset] SMTP не настроен. Ссылка сброса для ${to}: ${resetUrl}`);
     }
-    return;
+    return {
+      success: false,
+      skipped: true,
+      reason: 'smtp_not_configured',
+    };
   }
 
   try {
     await sendSmtpMail(config, to, resetUrl);
     console.log(`[Password reset] Письмо со ссылкой сброса отправлено на ${to}`);
+    return {
+      success: true,
+      skipped: false,
+    };
   } catch (error) {
     console.error('Failed to send password reset email:', error);
+    return {
+      success: false,
+      skipped: false,
+      reason: 'smtp_error',
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }

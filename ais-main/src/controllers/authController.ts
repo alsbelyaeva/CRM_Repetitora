@@ -9,9 +9,6 @@ import { logAuditAction } from '../services/auditLogService';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-change-me';
 const PASSWORD_RESET_TTL_MINUTES = 30;
-const PASSWORD_RESET_RESPONSE = {
-  message: 'Если такой email зарегистрирован, мы отправим ссылку для сброса пароля.',
-};
 
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET is required in production');
@@ -200,10 +197,14 @@ export async function forgotPassword(req: Request, res: Response) {
     const { email } = req.body;
 
     if (!email || typeof email !== 'string') {
-      return res.json(PASSWORD_RESET_RESPONSE);
+      return res.status(400).json({ error: 'Введите email аккаунта.' });
     }
 
     const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      return res.status(400).json({ error: 'Введите email аккаунта.' });
+    }
+
     const user = await prisma.user.findFirst({
       where: {
         email: {
@@ -218,7 +219,11 @@ export async function forgotPassword(req: Request, res: Response) {
     });
 
     if (!user) {
-      return res.json(PASSWORD_RESET_RESPONSE);
+      return res.status(404).json({
+        error: 'Аккаунт с таким email не найден.',
+        emailFound: false,
+        emailSent: false,
+      });
     }
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -247,7 +252,7 @@ export async function forgotPassword(req: Request, res: Response) {
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
     const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
 
-    await sendPasswordResetEmail(user.email, resetUrl);
+    const delivery = await sendPasswordResetEmail(user.email, resetUrl);
 
     await logAuditAction({
       userId: user.id,
@@ -256,10 +261,35 @@ export async function forgotPassword(req: Request, res: Response) {
       entityId: user.id,
       details: {
         deliveryAttempted: true,
+        emailSent: delivery.success,
+        deliveryReason: delivery.success ? 'sent' : delivery.reason,
       },
     });
 
-    return res.json(PASSWORD_RESET_RESPONSE);
+    if (delivery.success) {
+      return res.json({
+        message: `Аккаунт найден. Письмо со ссылкой для сброса пароля отправлено на ${user.email}.`,
+        emailFound: true,
+        emailSent: true,
+      });
+    }
+
+    if (delivery.reason === 'smtp_not_configured') {
+      return res.status(503).json({
+        error: process.env.NODE_ENV === 'production'
+          ? 'Аккаунт найден, но почтовая отправка не настроена. Письмо не отправлено.'
+          : 'Аккаунт найден, но SMTP-почта не настроена. Письмо не отправлено; ссылка сброса записана в логи backend.',
+        emailFound: true,
+        emailSent: false,
+      });
+    }
+
+    return res.status(502).json({
+      error: 'Аккаунт найден, но письмо отправить не удалось. Проверьте настройки SMTP.',
+      emailFound: true,
+      emailSent: false,
+      details: process.env.NODE_ENV === 'production' ? undefined : delivery.error,
+    });
   } catch (err: any) {
     console.error('❌ [Auth.forgotPassword] Ошибка запроса сброса пароля:', err);
     return res.status(500).json({

@@ -226,9 +226,12 @@ const tests: QualityTestCase[] = [
     name: 'SMTP без настроек не ломает восстановление пароля',
     run: async () => {
       await withoutEnv(['SMTP_HOST', 'SMTP_PORT', 'SMTP_FROM', 'SMTP_USER', 'SMTP_PASSWORD'], async () => {
-        await sendPasswordResetEmail('student@example.com', 'http://localhost:5173/reset-password?token=test');
+        const result = await sendPasswordResetEmail('student@example.com', 'http://localhost:5173/reset-password?token=test');
+        if (result.success || result.reason !== 'smtp_not_configured') {
+          throw new Error('Ожидался контролируемый пропуск SMTP без настроек');
+        }
       });
-      return 'sendPasswordResetEmail завершился без исключения';
+      return 'sendPasswordResetEmail завершился без исключения и вернул smtp_not_configured';
     },
   },
   {

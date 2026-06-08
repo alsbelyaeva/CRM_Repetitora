@@ -34,10 +34,16 @@ describe('External integrations graceful degradation', () => {
 
   it('SMTP без настроек не ломает отправку ссылки сброса пароля', async () => {
     await withoutEnv(['SMTP_HOST', 'SMTP_PORT', 'SMTP_FROM', 'SMTP_USER', 'SMTP_PASSWORD'], async () => {
-      await expect(sendPasswordResetEmail(
+      const result = await sendPasswordResetEmail(
         'student@example.com',
         'http://localhost:5173/reset-password?token=test'
-      )).resolves.toBeUndefined();
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.skipped).toBe(true);
+      if (!result.success) {
+        expect(result.reason).toBe('smtp_not_configured');
+      }
     });
   });
 });
