@@ -6,16 +6,13 @@ import crypto from 'crypto';
 import { getPasswordPolicyError } from '../utils/passwordPolicy';
 import { sendPasswordResetEmail } from '../services/mailService';
 import { logAuditAction } from '../services/auditLogService';
+import { normalizeEmail, validateAccountEmail } from '../utils/emailValidation';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-change-me';
 const PASSWORD_RESET_TTL_MINUTES = 30;
 
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET is required in production');
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
 }
 
 function hashResetToken(token: string) {
@@ -27,18 +24,16 @@ export async function register(req: Request, res: Response) {
     console.log('🔧 [Auth.register] Регистрация нового пользователя');
     
     const { email, password, fullName } = req.body;
-    const normalizedEmail = typeof email === 'string' ? normalizeEmail(email) : '';
 
     if (!email || !password) {
       console.log('❌ [Auth.register] Отсутствует email или пароль');
       return res.status(400).json({ error: 'Email и пароль обязательны' });
     }
 
-    // Проверка email формата
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(normalizedEmail)) {
-      console.log('❌ [Auth.register] Некорректный формат email:', email);
-      return res.status(400).json({ error: 'Некорректный формат email' });
+    const emailValidation = await validateAccountEmail(email);
+    if (!emailValidation.valid) {
+      console.log('❌ [Auth.register] Некорректный email:', emailValidation.error);
+      return res.status(400).json({ error: emailValidation.error });
     }
 
     const passwordPolicyError = getPasswordPolicyError(password);
@@ -49,7 +44,7 @@ export async function register(req: Request, res: Response) {
     const existing = await prisma.user.findFirst({
       where: {
         email: {
-          equals: normalizedEmail,
+          equals: emailValidation.email,
           mode: 'insensitive',
         },
       },
@@ -63,7 +58,7 @@ export async function register(req: Request, res: Response) {
 
     const user = await prisma.user.create({
       data: {
-        email: normalizedEmail,
+        email: emailValidation.email,
         passwordHash,
         fullName: fullName || null,
         role: 'TEACHER',
@@ -100,6 +95,8 @@ export async function register(req: Request, res: Response) {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        emailVerifiedAt: user.emailVerifiedAt,
+        emailVerified: Boolean(user.emailVerifiedAt),
         address: user.address,
         telegramChatId: user.telegramChatId,
         role: user.role,
@@ -139,6 +136,7 @@ export async function login(req: Request, res: Response) {
         email: true,
         passwordHash: true,
         fullName: true,
+        emailVerifiedAt: true,
         address: true,
         telegramChatId: true,
         role: true,
@@ -177,6 +175,8 @@ export async function login(req: Request, res: Response) {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        emailVerifiedAt: user.emailVerifiedAt,
+        emailVerified: Boolean(user.emailVerifiedAt),
         address: user.address,
         telegramChatId: user.telegramChatId,
         role: user.role,
@@ -410,6 +410,7 @@ export async function getMe(req: Request, res: Response) {
         id: true,
         email: true,
         fullName: true,
+        emailVerifiedAt: true,
         address: true,
         telegramChatId: true,
         role: true,
@@ -428,7 +429,10 @@ export async function getMe(req: Request, res: Response) {
 
     console.log(`✅ [getMe] Данные пользователя отправлены: ${user.email}`);
     
-    res.json(user);
+    res.json({
+      ...user,
+      emailVerified: Boolean(user.emailVerifiedAt),
+    });
   } catch (err: any) {
     console.error('❌ [Auth.getMe] Ошибка получения данных пользователя:', err);
     res.status(500).json({ 

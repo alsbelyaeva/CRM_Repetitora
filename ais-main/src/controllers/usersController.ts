@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import prisma from '../utils/prismaClient';
 import bcrypt from 'bcrypt';
 import { getPasswordPolicyError } from '../utils/passwordPolicy';
+import { validateAccountEmail } from '../utils/emailValidation';
 
 // --- Получение всех пользователей (только для админов) ---
 export const getAll = async (req: Request, res: Response) => {
@@ -27,6 +28,7 @@ export const getAll = async (req: Request, res: Response) => {
       select: {
         id: true,
         email: true,
+        emailVerifiedAt: true,
         fullName: true,
         address: true,
         telegramChatId: true,
@@ -88,10 +90,9 @@ export const create = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email и пароль обязательны' });
     }
 
-    // Проверка email формата
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: 'Некорректный формат email' });
+    const emailValidation = await validateAccountEmail(email);
+    if (!emailValidation.valid) {
+      return res.status(400).json({ error: emailValidation.error });
     }
 
     const passwordPolicyError = getPasswordPolicyError(password);
@@ -100,7 +101,14 @@ export const create = async (req: Request, res: Response) => {
     }
 
     // Проверяем существование пользователя
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: emailValidation.email,
+          mode: 'insensitive',
+        },
+      },
+    });
     if (existingUser) {
       return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
     }
@@ -109,7 +117,7 @@ export const create = async (req: Request, res: Response) => {
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: emailValidation.email,
         passwordHash,
         fullName: fullName || null,
         address: address ? String(address).trim() : null,
@@ -119,6 +127,7 @@ export const create = async (req: Request, res: Response) => {
       select: {
         id: true,
         email: true,
+        emailVerifiedAt: true,
         fullName: true,
         address: true,
         telegramChatId: true,
@@ -160,6 +169,7 @@ export const getById = async (req: Request, res: Response) => {
       select: {
         id: true,
         email: true,
+        emailVerifiedAt: true,
         fullName: true,
         address: true,
         telegramChatId: true,
@@ -226,10 +236,18 @@ export const update = async (req: Request, res: Response) => {
     
     // Обновление email
     if (email !== undefined) {
+      const emailValidation = await validateAccountEmail(email);
+      if (!emailValidation.valid) {
+        return res.status(400).json({ error: emailValidation.error });
+      }
+
       // Проверяем уникальность email
       const existingUser = await prisma.user.findFirst({
         where: {
-          email: email,
+          email: {
+            equals: emailValidation.email,
+            mode: 'insensitive',
+          },
           NOT: { id: targetUserId }
         }
       });
@@ -237,7 +255,8 @@ export const update = async (req: Request, res: Response) => {
       if (existingUser) {
         return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
       }
-      updateData.email = email;
+      updateData.email = emailValidation.email;
+      updateData.emailVerifiedAt = null;
     }
     
     // Обновление имени
@@ -280,6 +299,7 @@ export const update = async (req: Request, res: Response) => {
       select: {
         id: true,
         email: true,
+        emailVerifiedAt: true,
         fullName: true,
         address: true,
         telegramChatId: true,
@@ -331,6 +351,7 @@ export const remove = async (req: Request, res: Response) => {
       select: {
         id: true,
         email: true,
+        emailVerifiedAt: true,
         fullName: true,
       }
     });
@@ -361,6 +382,7 @@ export const getMe = async (req: Request, res: Response) => {
       select: {
         id: true,
         email: true,
+        emailVerifiedAt: true,
         fullName: true,
         address: true,
         telegramChatId: true,

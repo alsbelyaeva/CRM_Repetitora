@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../utils/apiBase';
-import { Users, Shield, ShieldOff, Mail, Calendar, MessageCircle } from 'lucide-react';
+import { Users, Shield, ShieldOff, Mail, Calendar, MessageCircle, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 
 interface User {
   id: string;
   email: string;
+  emailVerifiedAt?: string | null;
   fullName?: string;
   role: 'ADMIN' | 'TEACHER';
   telegramChatId?: string | null;
@@ -82,6 +83,12 @@ export default function AdminUsers() {
       : { label: 'Не подключен', className: 'bg-gray-100 text-gray-700' };
   };
 
+  const getEmailStatus = (user: User) => (
+    user.emailVerifiedAt
+      ? { label: 'Подтверждён', className: 'bg-emerald-100 text-emerald-800', icon: CheckCircle2 }
+      : { label: 'Не подтверждён', className: 'bg-amber-100 text-amber-800', icon: AlertCircle }
+  );
+
   const isCurrentUser = (userId: string) => userId === currentUser?.id;
 
   return (
@@ -116,6 +123,16 @@ export default function AdminUsers() {
                       {user.email}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
+                      {(() => {
+                        const status = getEmailStatus(user);
+                        const Icon = status.icon;
+                        return (
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${status.className}`}>
+                            <Icon className="w-3 h-3 mr-1" />
+                            Email: {status.label}
+                          </span>
+                        );
+                      })()}
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                         user.role === 'ADMIN'
                           ? 'bg-purple-100 text-purple-800'
@@ -247,9 +264,21 @@ export default function AdminUsers() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-900">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        {user.email}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-900">
+                          <Mail className="w-4 h-4 text-gray-400" />
+                          {user.email}
+                        </div>
+                        {(() => {
+                          const status = getEmailStatus(user);
+                          const Icon = status.icon;
+                          return (
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${status.className}`}>
+                              <Icon className="w-3 h-3 mr-1" />
+                              {status.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-6 py-4">

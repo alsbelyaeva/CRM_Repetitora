@@ -12,6 +12,7 @@ model User {
   email         String         @unique
   passwordHash  String         @map("password_hash")
   fullName      String?        @map("full_name")
+  emailVerifiedAt DateTime?    @map("email_verified_at")
   address       String?
   telegramChatId String?       @map("telegram_chat_id")
   role          UserRole

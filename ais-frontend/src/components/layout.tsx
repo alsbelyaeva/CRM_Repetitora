@@ -14,7 +14,9 @@ import {
   Info as InfoIcon,
   Menu,
   X,
-  ClipboardList
+  ClipboardList,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
 export default function Layout() {
@@ -27,6 +29,8 @@ export default function Layout() {
     logout();
     navigate('/login');
   };
+
+  const emailVerified = Boolean(user?.emailVerifiedAt || user?.emailVerified);
 
   const menuItems = [
     { path: '/', icon: Home, label: 'Обзор' },
@@ -73,6 +77,20 @@ export default function Layout() {
         <span className="inline-block mt-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
           {user?.role === 'ADMIN' ? 'Администратор' : 'Преподаватель'}
         </span>
+        {user?.email && (
+          <span className={`inline-flex items-center mt-2 px-2 py-1 text-xs rounded ${
+            emailVerified
+              ? 'bg-emerald-100 text-emerald-800'
+              : 'bg-amber-100 text-amber-800'
+          }`}>
+            {emailVerified ? (
+              <CheckCircle2 className="w-3 h-3 mr-1" />
+            ) : (
+              <AlertCircle className="w-3 h-3 mr-1" />
+            )}
+            {emailVerified ? 'Email подтверждён' : 'Email не подтверждён'}
+          </span>
+        )}
       </div>
 
       <nav className="mt-2 flex-1 overflow-y-auto pb-3">

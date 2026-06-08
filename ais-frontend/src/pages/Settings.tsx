@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { API_URL } from '../utils/apiBase';
-import { CalendarDays, Clock, ExternalLink, KeyRound, LayoutGrid, MessageCircle, Navigation, QrCode, RefreshCw, Save, SlidersHorizontal, Star } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Clock, ExternalLink, KeyRound, LayoutGrid, Mail, MessageCircle, Navigation, QrCode, RefreshCw, Save, SlidersHorizontal, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppUser, getTeacherOptions, getUserLabel } from '../utils/admin';
 import { getPasswordIssues, getPasswordPolicyError } from '../utils/passwordPolicy';
@@ -152,6 +152,8 @@ export default function Settings() {
   const selectedTeacher = isAdmin
     ? users.find(item => item.id === selectedUserId)
     : undefined;
+  const accountForStatus = isAdmin ? selectedTeacher : user;
+  const emailVerified = Boolean(accountForStatus?.emailVerifiedAt || accountForStatus?.emailVerified);
 
   useEffect(() => {
     const currentAddress = isAdmin
@@ -454,6 +456,41 @@ export default function Settings() {
             <p className="text-sm text-blue-800">{profileMessage}</p>
           </div>
         )}
+
+        <div className="bg-white rounded-lg shadow p-4 md:p-6">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-bold text-gray-800">Email аккаунта</h2>
+                  <p className="text-sm text-gray-600 mt-1 break-all">
+                    {accountForStatus?.email || 'Email не найден'}
+                  </p>
+                </div>
+                <span className={`inline-flex items-center w-fit px-3 py-1.5 rounded-full text-sm font-semibold ${
+                  emailVerified
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {emailVerified ? (
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                  )}
+                  {emailVerified ? 'Email подтверждён' : 'Email не подтверждён'}
+                </span>
+              </div>
+              {!emailVerified && (
+                <p className="text-sm text-gray-600 mt-3">
+                  Статус показывает, проходил ли аккаунт подтверждение email. Отправку письма подтверждения можно подключить следующим этапом.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
 
         <div className="bg-white rounded-lg shadow p-4 md:p-6">
           <div className="flex items-start gap-3 mb-4">

@@ -6,6 +6,8 @@ import { API_URL } from '../utils/apiBase';
 interface User {
   id: string;
   email: string;
+  emailVerifiedAt?: string | null;
+  emailVerified?: boolean;
   fullName?: string;
   address?: string | null;
   telegramChatId?: string | null;

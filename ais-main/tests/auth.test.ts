@@ -35,6 +35,8 @@ describe('Auth API', () => {
     expect(res.status).toBe(201);
     expect(res.body.token).toBeTruthy();
     expect(res.body.user.role).toBe('TEACHER');
+    expect(res.body.user.emailVerified).toBe(false);
+    expect(res.body.user.emailVerifiedAt).toBeNull();
   });
 
   it('POST /api/auth/login авторизует тестового преподавателя', async () => {
