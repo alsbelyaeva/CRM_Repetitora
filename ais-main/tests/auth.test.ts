@@ -10,6 +10,10 @@ function hashResetToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+function hashEmailVerificationToken(token: string) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 describe('Auth API', () => {
   let seed: Awaited<ReturnType<typeof seedTestData>>;
 
@@ -70,6 +74,58 @@ describe('Auth API', () => {
       expect(missing.body.emailSent).toBe(false);
       expect(missing.body.error).toMatch(/не найден/);
     });
+  });
+
+  it('POST /api/auth/email-verification/request создает токен подтверждения email', async () => {
+    await withoutEnv(['SMTP_HOST', 'SMTP_PORT', 'SMTP_FROM', 'SMTP_USER', 'SMTP_PASSWORD'], async () => {
+      const res = await request(app)
+        .post('/api/auth/email-verification/request')
+        .set(authHeader(seed.teacher))
+        .send();
+
+      expect(res.status).toBe(503);
+      expect(res.body.emailVerified).toBe(false);
+      expect(res.body.emailSent).toBe(false);
+
+      const token = await testPrisma.emailVerificationToken.findFirst({
+        where: {
+          userId: seed.teacher.id,
+          email: seed.teacher.email,
+          usedAt: null,
+        },
+      });
+
+      expect(token).toBeTruthy();
+      expect(token?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    });
+  });
+
+  it('POST /api/auth/email-verification/confirm подтверждает email и инвалидирует ссылку', async () => {
+    const token = 'email-verification-token';
+    await testPrisma.emailVerificationToken.create({
+      data: {
+        userId: seed.teacher.id,
+        email: seed.teacher.email,
+        tokenHash: hashEmailVerificationToken(token),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    const res = await request(app)
+      .post('/api/auth/email-verification/confirm')
+      .send({ token });
+
+    expect(res.status).toBe(200);
+    expect(res.body.emailVerified).toBe(true);
+
+    const user = await testPrisma.user.findUnique({ where: { id: seed.teacher.id } });
+    expect(user?.emailVerifiedAt).toBeTruthy();
+
+    const secondUse = await request(app)
+      .post('/api/auth/email-verification/confirm')
+      .send({ token });
+
+    expect(secondUse.status).toBe(400);
   });
 
   it('POST /api/auth/reset-password меняет пароль по действующему токену и инвалидирует его', async () => {

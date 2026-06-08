@@ -33,29 +33,47 @@ function escapeAddress(address: string) {
   return address.replace(/[<>\r\n]/g, '');
 }
 
-function buildResetMessage(from: string, to: string, resetUrl: string) {
+function buildPlainTextMessage(from: string, to: string, subject: string, lines: string[]) {
   const safeFrom = escapeAddress(from);
   const safeTo = escapeAddress(to);
+  const encodedSubject = Buffer.from(subject, 'utf8').toString('base64');
 
   return [
     `From: ${safeFrom}`,
     `To: ${safeTo}`,
-    'Subject: =?UTF-8?B?0KHQsdGA0L7RgSDQv9Cw0YDQvtC70Y8=?=',
+    `Subject: =?UTF-8?B?${encodedSubject}?=`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=utf-8',
     '',
+    ...lines,
+    '',
+    '.',
+  ].join('\r\n');
+}
+
+function buildResetMessage(from: string, to: string, resetUrl: string) {
+  return buildPlainTextMessage(from, to, 'Сброс пароля', [
     'Вы запросили сброс пароля в CRM-системе.',
     '',
     'Перейдите по ссылке, чтобы задать новый пароль:',
     resetUrl,
     '',
     'Ссылка действует 30 минут. Если вы не запрашивали сброс пароля, просто проигнорируйте это письмо.',
-    '',
-    '.',
-  ].join('\r\n');
+  ]);
 }
 
-async function sendSmtpMail(config: SmtpConfig, to: string, resetUrl: string) {
+function buildEmailVerificationMessage(from: string, to: string, verificationUrl: string) {
+  return buildPlainTextMessage(from, to, 'Подтверждение email', [
+    'Вы запросили подтверждение email в CRM-системе.',
+    '',
+    'Перейдите по ссылке, чтобы подтвердить адрес:',
+    verificationUrl,
+    '',
+    'Ссылка действует 24 часа. Если вы не запрашивали подтверждение, просто проигнорируйте это письмо.',
+  ]);
+}
+
+async function sendSmtpMail(config: SmtpConfig, to: string, message: string) {
   let socket: net.Socket | tls.TLSSocket = await new Promise<net.Socket | tls.TLSSocket>((resolve, reject) => {
     const client = config.secure
       ? tls.connect({ port: config.port, host: config.host }, () => resolve(client))
@@ -142,7 +160,7 @@ async function sendSmtpMail(config: SmtpConfig, to: string, resetUrl: string) {
     await command(`MAIL FROM:<${escapeAddress(config.from)}>`, '250');
     await command(`RCPT TO:<${escapeAddress(to)}>`, ['250', '251']);
     await command('DATA', '354');
-    socket.write(`${buildResetMessage(config.from, to, resetUrl)}\r\n`);
+    socket.write(`${message}\r\n`);
 
     const dataResponse = await waitForResponse();
     if (!dataResponse.startsWith('250')) {
@@ -160,6 +178,8 @@ export type PasswordResetEmailResult =
   | { success: false; skipped: true; reason: 'smtp_not_configured' }
   | { success: false; skipped: false; reason: 'smtp_error'; error: string };
 
+export type EmailDeliveryResult = PasswordResetEmailResult;
+
 export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<PasswordResetEmailResult> {
   const config = getSmtpConfig();
 
@@ -175,7 +195,7 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
   }
 
   try {
-    await sendSmtpMail(config, to, resetUrl);
+    await sendSmtpMail(config, to, buildResetMessage(config.from, to, resetUrl));
     console.log(`[Password reset] Письмо со ссылкой сброса отправлено на ${to}`);
     return {
       success: true,
@@ -183,6 +203,38 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
     };
   } catch (error) {
     console.error('Failed to send password reset email:', error);
+    return {
+      success: false,
+      skipped: false,
+      reason: 'smtp_error',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export async function sendEmailVerificationEmail(to: string, verificationUrl: string): Promise<EmailDeliveryResult> {
+  const config = getSmtpConfig();
+
+  if (!config) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Email verification] SMTP не настроен. Ссылка подтверждения для ${to}: ${verificationUrl}`);
+    }
+    return {
+      success: false,
+      skipped: true,
+      reason: 'smtp_not_configured',
+    };
+  }
+
+  try {
+    await sendSmtpMail(config, to, buildEmailVerificationMessage(config.from, to, verificationUrl));
+    console.log(`[Email verification] Письмо подтверждения отправлено на ${to}`);
+    return {
+      success: true,
+      skipped: false,
+    };
+  } catch (error) {
+    console.error('Failed to send email verification email:', error);
     return {
       success: false,
       skipped: false,

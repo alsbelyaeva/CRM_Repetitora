@@ -4,18 +4,23 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { getPasswordPolicyError } from '../utils/passwordPolicy';
-import { sendPasswordResetEmail } from '../services/mailService';
+import { sendEmailVerificationEmail, sendPasswordResetEmail } from '../services/mailService';
 import { logAuditAction } from '../services/auditLogService';
 import { normalizeEmail, validateAccountEmail } from '../utils/emailValidation';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-secret-change-me';
 const PASSWORD_RESET_TTL_MINUTES = 30;
+const EMAIL_VERIFICATION_TTL_HOURS = 24;
 
 if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET is required in production');
 }
 
 function hashResetToken(token: string) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function hashEmailVerificationToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
@@ -294,6 +299,181 @@ export async function forgotPassword(req: Request, res: Response) {
     console.error('❌ [Auth.forgotPassword] Ошибка запроса сброса пароля:', err);
     return res.status(500).json({
       error: 'Ошибка при обработке запроса сброса пароля',
+      details: process.env.NODE_ENV === 'production' ? undefined : err.message,
+    });
+  }
+}
+
+export async function requestEmailVerification(req: Request, res: Response) {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Не авторизован' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        emailVerifiedAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    if (user.emailVerifiedAt) {
+      return res.json({
+        message: 'Email уже подтверждён.',
+        emailVerified: true,
+        emailSent: false,
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashEmailVerificationToken(token);
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_HOURS * 60 * 60 * 1000);
+
+    await prisma.$transaction([
+      prisma.emailVerificationToken.updateMany({
+        where: {
+          userId: user.id,
+          email: user.email,
+          usedAt: null,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      }),
+      prisma.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          email: user.email,
+          tokenHash,
+          expiresAt,
+        },
+      }),
+    ]);
+
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+    const verificationUrl = `${frontendUrl}/verify-email?token=${encodeURIComponent(token)}`;
+    const delivery = await sendEmailVerificationEmail(user.email, verificationUrl);
+
+    await logAuditAction({
+      userId: user.id,
+      action: 'auth.emailVerification.request',
+      entity: 'User',
+      entityId: user.id,
+      details: {
+        emailSent: delivery.success,
+        deliveryReason: delivery.success ? 'sent' : delivery.reason,
+      },
+    });
+
+    if (delivery.success) {
+      return res.json({
+        message: `Письмо для подтверждения email отправлено на ${user.email}.`,
+        emailVerified: false,
+        emailSent: true,
+      });
+    }
+
+    if (delivery.reason === 'smtp_not_configured') {
+      return res.status(503).json({
+        error: process.env.NODE_ENV === 'production'
+          ? 'Почтовая отправка не настроена. Письмо подтверждения не отправлено.'
+          : 'SMTP-почта не настроена. Письмо подтверждения не отправлено; ссылка записана в логи backend.',
+        emailVerified: false,
+        emailSent: false,
+      });
+    }
+
+    return res.status(502).json({
+      error: 'Письмо подтверждения отправить не удалось. Проверьте настройки SMTP.',
+      emailVerified: false,
+      emailSent: false,
+      details: process.env.NODE_ENV === 'production' ? undefined : delivery.error,
+    });
+  } catch (err: any) {
+    console.error('❌ [Auth.requestEmailVerification] Ошибка запроса подтверждения email:', err);
+    return res.status(500).json({
+      error: 'Ошибка при запросе подтверждения email',
+      details: process.env.NODE_ENV === 'production' ? undefined : err.message,
+    });
+  }
+}
+
+export async function verifyEmail(req: Request, res: Response) {
+  try {
+    const { token } = req.body;
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'Некорректная ссылка подтверждения email' });
+    }
+
+    const tokenHash = hashEmailVerificationToken(token);
+    const verificationToken = await prisma.emailVerificationToken.findUnique({
+      where: { tokenHash },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            emailVerifiedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!verificationToken || verificationToken.usedAt) {
+      return res.status(400).json({ error: 'Ссылка подтверждения недействительна или уже использована' });
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Срок действия ссылки подтверждения истёк' });
+    }
+
+    if (normalizeEmail(verificationToken.email) !== normalizeEmail(verificationToken.user.email)) {
+      return res.status(400).json({
+        error: 'Email аккаунта изменился после отправки письма. Запросите новую ссылку подтверждения.',
+      });
+    }
+
+    const verifiedAt = verificationToken.user.emailVerifiedAt || new Date();
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: verificationToken.userId },
+        data: { emailVerifiedAt: verifiedAt },
+      }),
+      prisma.emailVerificationToken.update({
+        where: { id: verificationToken.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    await logAuditAction({
+      userId: verificationToken.userId,
+      action: 'auth.emailVerification.confirm',
+      entity: 'User',
+      entityId: verificationToken.userId,
+      details: {
+        email: verificationToken.email,
+      },
+    });
+
+    return res.json({
+      message: 'Email успешно подтверждён.',
+      emailVerified: true,
+      emailVerifiedAt: verifiedAt,
+    });
+  } catch (err: any) {
+    console.error('❌ [Auth.verifyEmail] Ошибка подтверждения email:', err);
+    return res.status(500).json({
+      error: 'Ошибка при подтверждении email',
       details: process.env.NODE_ENV === 'production' ? undefined : err.message,
     });
   }

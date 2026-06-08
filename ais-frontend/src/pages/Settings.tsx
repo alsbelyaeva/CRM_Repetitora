@@ -143,6 +143,9 @@ export default function Settings() {
   const [botInfo, setBotInfo] = useState<{ configured: boolean; username?: string | null; message?: string | null } | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [emailVerificationLoading, setEmailVerificationLoading] = useState(false);
+  const [emailVerificationMessage, setEmailVerificationMessage] = useState<string | null>(null);
+  const [emailVerificationError, setEmailVerificationError] = useState<string | null>(null);
 
   const totalWeight = useMemo(() => {
     return weights.wTime + weights.wCompact + weights.wWorkingDay + weights.wPriority + weights.wTravel;
@@ -154,6 +157,7 @@ export default function Settings() {
     : undefined;
   const accountForStatus = isAdmin ? selectedTeacher : user;
   const emailVerified = Boolean(accountForStatus?.emailVerifiedAt || accountForStatus?.emailVerified);
+  const canRequestEmailVerification = !isAdmin && Boolean(user?.email) && !emailVerified;
 
   useEffect(() => {
     const currentAddress = isAdmin
@@ -287,6 +291,22 @@ export default function Settings() {
       alert(message);
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  const handleEmailVerificationRequest = async () => {
+    setEmailVerificationLoading(true);
+    setEmailVerificationMessage(null);
+    setEmailVerificationError(null);
+
+    try {
+      const response = await axios.post(`${API_URL}/api/auth/email-verification/request`);
+      setEmailVerificationMessage(response.data?.message || 'Письмо для подтверждения email отправлено.');
+      await refreshUser();
+    } catch (error: any) {
+      setEmailVerificationError(error.response?.data?.error || 'Письмо подтверждения email не отправлено');
+    } finally {
+      setEmailVerificationLoading(false);
     }
   };
 
@@ -457,6 +477,18 @@ export default function Settings() {
           </div>
         )}
 
+        {emailVerificationMessage && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+            <p className="text-sm text-emerald-800">{emailVerificationMessage}</p>
+          </div>
+        )}
+
+        {emailVerificationError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-800">{emailVerificationError}</p>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow p-4 md:p-6">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
@@ -485,8 +517,21 @@ export default function Settings() {
               </div>
               {!emailVerified && (
                 <p className="text-sm text-gray-600 mt-3">
-                  Статус показывает, проходил ли аккаунт подтверждение email. Отправку письма подтверждения можно подключить следующим этапом.
+                  {isAdmin
+                    ? 'Подтверждение выполняет владелец аккаунта через свой личный кабинет.'
+                    : 'Нажмите кнопку, чтобы получить письмо со ссылкой подтверждения.'}
                 </p>
+              )}
+              {canRequestEmailVerification && (
+                <button
+                  type="button"
+                  onClick={handleEmailVerificationRequest}
+                  disabled={emailVerificationLoading}
+                  className="mt-4 inline-flex items-center justify-center w-full sm:w-auto bg-indigo-600 text-white px-5 py-3 sm:py-2.5 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  {emailVerificationLoading ? 'Отправка...' : 'Отправить письмо подтверждения'}
+                </button>
               )}
             </div>
           </div>
