@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { Search, Users, Mail, Phone, Calendar, DollarSign, X, MessageCircle } from 'lucide-react';
 
 
@@ -60,7 +59,7 @@ export default function AdminClients() {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/admin/clients`);
+      const response = await axios.get(`/api/admin/clients`);
       setClients(response.data);
     } catch (error) {
       console.error('Failed to fetch clients:', error);
@@ -73,7 +72,7 @@ export default function AdminClients() {
   const fetchClientDetails = async (clientId: number) => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/admin/clients/${clientId}`);
+      const response = await axios.get(`/api/admin/clients/${clientId}`);
       setSelectedClient(response.data);
       setShowDetailsModal(true);
     } catch (error) {

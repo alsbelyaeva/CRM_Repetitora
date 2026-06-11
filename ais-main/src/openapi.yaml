@@ -8,8 +8,8 @@ info:
     name: API Support
 
 servers:
-  - url: http://192.168.56.104:4000
-    description: Development server
+  - url: /
+    description: Current host
 
 components:
   securitySchemes:

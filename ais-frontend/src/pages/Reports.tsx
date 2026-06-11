@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { Download, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppUser, getTeacherOptions, getUserLabel } from '../utils/admin';
@@ -43,7 +42,7 @@ export default function Reports() {
 
   useEffect(() => {
     if (isAdmin) {
-      axios.get(`${API_URL}/api/users`)
+      axios.get(`/api/users`)
         .then((response) => setUsers(response.data))
         .catch((error) => console.error('Ошибка загрузки пользователей:', error));
     }
@@ -58,8 +57,8 @@ export default function Reports() {
       
       const teacherQuery = selectedUserId ? `?userId=${selectedUserId}` : '';
       const [lessonsRes, paymentsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/lessons${teacherQuery}`),
-        axios.get(`${API_URL}/api/payments${teacherQuery}`)
+        axios.get(`/api/lessons${teacherQuery}`),
+        axios.get(`/api/payments${teacherQuery}`)
       ]);
 
       console.log(`✅ Загружено ${lessonsRes.data.length} занятий`);

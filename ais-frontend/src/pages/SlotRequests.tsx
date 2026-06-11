@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { AlertTriangle, Plus, Repeat, RotateCcw, Star, Trash2, TrendingUp, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppUser, getTeacherOptions, getUserLabel } from '../utils/admin';
@@ -617,7 +616,7 @@ export default function SlotRequests() {
 
   useEffect(() => {
     if (isAdmin) {
-      axios.get(`${API_URL}/api/users`)
+      axios.get(`/api/users`)
         .then((response) => setUsers(response.data))
         .catch((error) => console.error('Failed to fetch users:', error));
     }
@@ -635,7 +634,7 @@ export default function SlotRequests() {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/api/clients${teacherQuery}`);
+      const response = await axios.get(`/api/clients${teacherQuery}`);
       setClients(response.data);
     } catch (error) {
       console.error('Failed to fetch clients:', error);
@@ -654,7 +653,7 @@ export default function SlotRequests() {
       params.set('status', requestFilter);
       if (selectedUserId) params.set('userId', selectedUserId);
 
-      const response = await axios.get(`${API_URL}/api/slot-requests?${params.toString()}`);
+      const response = await axios.get(`/api/slot-requests?${params.toString()}`);
       const mapped = await Promise.all(response.data
         .map(mapRequest)
         .map(refreshPendingSlotScores));
@@ -679,7 +678,7 @@ export default function SlotRequests() {
     if (slotsToRank.length === 0) return request;
 
     try {
-      const response = await axios.post(`${API_URL}/api/slots/rank`, {
+      const response = await axios.post(`/api/slots/rank`, {
         clientId: request.clientId,
         proposedSlots: slotsToRank.map(slot => ({ from: slot.from, to: slot.to })),
         ...(isAdmin ? { userId: selectedUserId } : {}),
@@ -718,7 +717,7 @@ export default function SlotRequests() {
       };
 
       if (JSON.stringify(refreshedRequest.slots) !== JSON.stringify(request.slots)) {
-        await axios.put(`${API_URL}/api/slot-requests/${request.requestId}`, {
+        await axios.put(`/api/slot-requests/${request.requestId}`, {
           proposedSlots: refreshedRequest.slots,
           status: request.status,
         });
@@ -803,7 +802,7 @@ export default function SlotRequests() {
     }
 
     try {
-      const rankingResponse = await axios.post(`${API_URL}/api/slots/rank`, {
+      const rankingResponse = await axios.post(`/api/slots/rank`, {
         clientId: Number(selectedClient),
         proposedSlots,
         ...(isAdmin ? { userId: selectedUserId } : {}),
@@ -821,7 +820,7 @@ export default function SlotRequests() {
           : null,
       }));
 
-      await axios.post(`${API_URL}/api/slot-requests`, {
+      await axios.post(`/api/slot-requests`, {
         clientId: Number(selectedClient),
         proposedSlots: rankedSlots,
         status: 'PENDING',
@@ -898,7 +897,7 @@ export default function SlotRequests() {
           ? 'CONFIRMED'
           : request.status;
 
-      await axios.put(`${API_URL}/api/slot-requests/${request.requestId}`, {
+      await axios.put(`/api/slot-requests/${request.requestId}`, {
         proposedSlots: updatedSlots,
         status: nextStatus,
       });
@@ -932,7 +931,7 @@ export default function SlotRequests() {
       }
 
       if (slot.recurrence?.enabled) {
-        const response = await axios.post(`${API_URL}/api/lessons/recurring-series`, {
+        const response = await axios.post(`/api/lessons/recurring-series`, {
           clientId,
           weekday: getIsoWeekday(from),
           startTime: formatTimeOnly(from),
@@ -960,7 +959,7 @@ export default function SlotRequests() {
 
         if (!confirmReplace) return;
 
-        const response = await axios.post(`${API_URL}/api/slots/replace`, {
+        const response = await axios.post(`/api/slots/replace`, {
           conflictingLessonId: slot.conflictingLesson.id,
           selectedSlot: slot,
           clientId,
@@ -970,7 +969,7 @@ export default function SlotRequests() {
         });
         createdLessonId = response.data?.lesson?.id;
       } else {
-        const response = await axios.post(`${API_URL}/api/lessons`, {
+        const response = await axios.post(`/api/lessons`, {
           clientId,
           startTime: slot.from,
           durationMin: duration,
@@ -995,7 +994,7 @@ export default function SlotRequests() {
 
   const rejectSlot = async (requestId: number, slotIndex: number) => {
     try {
-      await axios.patch(`${API_URL}/api/slot-requests/${requestId}/reject`, { slotIndex });
+      await axios.patch(`/api/slot-requests/${requestId}/reject`, { slotIndex });
       await fetchRequests();
     } catch (error: any) {
       alert(error.response?.data?.error || 'Ошибка отклонения слота');
@@ -1007,7 +1006,7 @@ export default function SlotRequests() {
 
     try {
       await Promise.all(allClientRequests.map(request => (
-        axios.delete(`${API_URL}/api/slot-requests/${request.requestId}`)
+        axios.delete(`/api/slot-requests/${request.requestId}`)
       )));
       await fetchRequests();
     } catch (error: any) {
@@ -1017,7 +1016,7 @@ export default function SlotRequests() {
 
   const restoreSlot = async (requestId: number, slotIndex: number) => {
     try {
-      await axios.patch(`${API_URL}/api/slot-requests/${requestId}/slots/${slotIndex}/restore`);
+      await axios.patch(`/api/slot-requests/${requestId}/slots/${slotIndex}/restore`);
       await fetchRequests();
     } catch (error: any) {
       alert(error.response?.data?.error || 'Ошибка восстановления слота');
@@ -1028,7 +1027,7 @@ export default function SlotRequests() {
     if (!confirm('Отменить выбор этого слота и связанное занятие?')) return;
 
     try {
-      await axios.patch(`${API_URL}/api/slot-requests/${requestId}/slots/${slotIndex}/cancel-selection`);
+      await axios.patch(`/api/slot-requests/${requestId}/slots/${slotIndex}/cancel-selection`);
       await fetchRequests();
       alert('Выбор отменен');
     } catch (error: any) {

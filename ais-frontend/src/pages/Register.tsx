@@ -2,7 +2,6 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { getPasswordIssues, getPasswordPolicyError } from '../utils/passwordPolicy';
 
 
@@ -43,9 +42,9 @@ export default function Register() {
     setLoading(true);
 
     try {
-      console.log('🚀 Отправка регистрации на:', `${API_URL}/api/auth/register`);
+      console.log('🚀 Отправка регистрации на:', `/api/auth/register`);
 
-      const response = await axios.post(`${API_URL}/api/auth/register`, {
+      const response = await axios.post(`/api/auth/register`, {
         email: formData.email,
         password: formData.password,
         fullName: formData.fullName,

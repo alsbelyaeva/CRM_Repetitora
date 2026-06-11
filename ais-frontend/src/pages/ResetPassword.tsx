@@ -1,7 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { getPasswordIssues } from '../utils/passwordPolicy';
 
 
@@ -38,7 +37,7 @@ export default function ResetPassword() {
 
     setLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/auth/reset-password`, {
+      const response = await axios.post(`/api/auth/reset-password`, {
         token,
         newPassword,
         confirmPassword,

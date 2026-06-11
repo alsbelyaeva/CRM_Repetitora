@@ -1,7 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { Save, ArrowLeft } from 'lucide-react';
 
 
@@ -26,7 +25,7 @@ export default function ClientForm() {
 
   const fetchClient = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/clients/${id}`);
+      const response = await axios.get(`/api/clients/${id}`);
       setFormData({
         fullName: response.data.fullName || '',
         address: response.data.address || '',
@@ -56,9 +55,9 @@ export default function ClientForm() {
       };
 
       if (id) {
-        await axios.put(`${API_URL}/api/clients/${id}`, payload);
+        await axios.put(`/api/clients/${id}`, payload);
       } else {
-        await axios.post(`${API_URL}/api/clients`, payload);
+        await axios.post(`/api/clients`, payload);
       }
       navigate('/clients');
     } catch (error: any) {

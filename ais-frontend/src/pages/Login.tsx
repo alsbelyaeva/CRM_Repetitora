@@ -2,9 +2,6 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { API_URL } from '../utils/apiBase';
-
-// ✅ Добавляем API_URL
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -39,7 +36,7 @@ export default function Login() {
         }
       } else if (err.request) {
         console.error('📡 Нет ответа от сервера:', err.request);
-        setError('Не удалось подключиться к серверу. Проверьте адрес: ' + API_URL);
+        setError('Не удалось подключиться к серверу. Проверьте доступность backend и reverse proxy для /api.');
       } else {
         setError(err.message || 'Произошла неизвестная ошибка');
       }

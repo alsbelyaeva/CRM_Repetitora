@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { Briefcase, Check, Edit, MapPin, Plus, Repeat, Trash2, X, XCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppUser, getTeacherOptions, getUserLabel } from '../utils/admin';
@@ -153,7 +152,7 @@ export default function Calendar() {
 
   useEffect(() => {
     if (isAdmin) {
-      axios.get(`${API_URL}/api/users`)
+      axios.get(`/api/users`)
         .then((response) => setUsers(response.data))
         .catch((error) => console.error('Failed to fetch users:', error));
     }
@@ -181,7 +180,7 @@ export default function Calendar() {
     if (isAdmin && !selectedUserId) return;
 
     try {
-      const response = await axios.get(`${API_URL}/api/lessons${teacherQuery}`);
+      const response = await axios.get(`/api/lessons${teacherQuery}`);
       const sorted = response.data.sort((a: Lesson, b: Lesson) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
       setLessons(sorted);
     } catch (error) {
@@ -193,7 +192,7 @@ export default function Calendar() {
     if (isAdmin && !selectedUserId) return;
 
     try {
-      const response = await axios.get(`${API_URL}/api/schedule-events${teacherQuery}`);
+      const response = await axios.get(`/api/schedule-events${teacherQuery}`);
       const sorted = response.data.sort((a: ScheduleEvent, b: ScheduleEvent) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
       setEvents(sorted);
     } catch (error) {
@@ -205,7 +204,7 @@ export default function Calendar() {
     if (isAdmin && !selectedUserId) return;
 
     try {
-      const response = await axios.get(`${API_URL}/api/clients${teacherQuery}`);
+      const response = await axios.get(`/api/clients${teacherQuery}`);
       setClients(response.data);
     } catch (error) {
       console.error('Failed to fetch clients:', error);
@@ -216,7 +215,7 @@ export default function Calendar() {
     if (isAdmin && !selectedUserId) return;
 
     try {
-      const response = await axios.get(`${API_URL}/api/lessons/stats${teacherQuery}`);
+      const response = await axios.get(`/api/lessons/stats${teacherQuery}`);
       setCancelledCount(response.data.cancelled || 0);
       setDoneCount(response.data.done || 0);
     } catch (error) {
@@ -262,7 +261,7 @@ export default function Calendar() {
 
       if (!scope) return;
 
-      await axios.patch(`${API_URL}/api/lessons/${lessonId}/status`, { status: newStatus, scope });
+      await axios.patch(`/api/lessons/${lessonId}/status`, { status: newStatus, scope });
       await Promise.all([fetchLessons(), fetchLessonStats()]);
       setShowLessonDetailsModal(false);
       alert(`Статус занятия обновлен на "${getStatusText(newStatus)}"`);
@@ -274,7 +273,7 @@ export default function Calendar() {
 
   const updateEventStatus = async (eventId: number, status: ScheduleEvent['status']) => {
     try {
-      await axios.patch(`${API_URL}/api/schedule-events/${eventId}/status`, { status });
+      await axios.patch(`/api/schedule-events/${eventId}/status`, { status });
       await fetchEvents();
       setShowEventModal(false);
       resetEventForm();
@@ -288,7 +287,7 @@ export default function Calendar() {
     if (!confirm('Удалить событие без возможности восстановления?')) return;
 
     try {
-      await axios.delete(`${API_URL}/api/schedule-events/${eventId}`);
+      await axios.delete(`/api/schedule-events/${eventId}`);
       await fetchEvents();
       setShowEventModal(false);
       resetEventForm();
@@ -365,9 +364,9 @@ export default function Calendar() {
 
       const editScope = editingLesson?.recurringSeriesId ? recurringEditScope : 'single';
       const response = editingLesson
-        ? await axios.put(`${API_URL}/api/lessons/${editingLesson.id}`, { ...formattedData, scope: editScope })
+        ? await axios.put(`/api/lessons/${editingLesson.id}`, { ...formattedData, scope: editScope })
         : formData.repeatEnabled
-        ? await axios.post(`${API_URL}/api/lessons/recurring-series`, {
+        ? await axios.post(`/api/lessons/recurring-series`, {
             clientId: formattedData.clientId,
             participantClientIds: formattedData.participantClientIds,
             weekday: formData.repeatWeekday,
@@ -380,7 +379,7 @@ export default function Calendar() {
             notes: formattedData.notes,
             ...(isAdmin && selectedUserId ? { userId: selectedUserId } : {}),
           })
-        : await axios.post(`${API_URL}/api/lessons`, formattedData);
+        : await axios.post(`/api/lessons`, formattedData);
 
       setShowModal(false);
       await Promise.all([fetchLessons(), fetchLessonStats()]);
@@ -434,9 +433,9 @@ export default function Calendar() {
       };
 
       if (editingEvent) {
-        await axios.put(`${API_URL}/api/schedule-events/${editingEvent.id}`, payload);
+        await axios.put(`/api/schedule-events/${editingEvent.id}`, payload);
       } else {
-        await axios.post(`${API_URL}/api/schedule-events`, payload);
+        await axios.post(`/api/schedule-events`, payload);
       }
 
       await fetchEvents();

@@ -154,7 +154,6 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_USERNAME=
 TWO_GIS_API_KEY=
 
-VITE_API_URL=
 VITE_PROXY_TARGET=http://backend:4000
 ```
 
@@ -179,9 +178,31 @@ docker compose up -d --build
 После запуска:
 
 - frontend: `http://localhost:5173`;
-- backend API: `http://localhost:4000`;
+- backend API через frontend: `http://localhost:5173/api`;
+- backend API напрямую: `http://localhost:4000`;
 - Swagger/OpenAPI: `http://localhost:4000/docs`;
 - PostgreSQL: `localhost:5432`.
+
+## Развертывание на одном домене
+
+Frontend обращается к backend только через относительный префикс `/api`. В production не нужно задавать отдельный публичный адрес API или жестко прописывать домен backend во frontend.
+
+Reverse proxy на сервере должен направлять:
+
+- `/api/*` на backend, например `http://backend:4000`;
+- `/docs/*` на backend, если нужен доступ к Swagger/OpenAPI;
+- все остальные запросы на frontend, например `http://frontend:5173`.
+
+В локальной разработке Vite проксирует `/api` на backend через `VITE_PROXY_TARGET`. Для Docker значение по умолчанию: `http://backend:4000`.
+
+Для production рекомендуется указать:
+
+```env
+FRONTEND_URL=https://your-domain.example
+CORS_ORIGINS=https://your-domain.example
+```
+
+Если frontend и backend доступны пользователю через один домен, CORS не должен требовать отдельного публичного адреса backend.
 
 ## Миграции и тестовые данные
 

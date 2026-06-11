@@ -12,11 +12,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      '/auth': {
-        target: process.env.VITE_PROXY_TARGET || 'http://localhost:4000',
-        changeOrigin: true,
-        secure: false,
-      },
     },
   },
 });

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { Plus, Edit, Trash2, Star, MessageCircle, QrCode, RefreshCw, Copy, Check, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppUser, getTeacherOptions, getUserLabel } from '../utils/admin';
@@ -57,7 +56,7 @@ export default function Clients() {
 
   const fetchBotInfo = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/telegram/bot-info`);
+      const response = await axios.get(`/api/telegram/bot-info`);
       setBotInfo(response.data);
     } catch (error) {
       console.error('Failed to fetch Telegram bot info:', error);
@@ -66,7 +65,7 @@ export default function Clients() {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/users`);
+      const response = await axios.get(`/api/users`);
       setUsers(response.data);
     } catch (error) {
       console.error('Failed to fetch users:', error);
@@ -75,7 +74,7 @@ export default function Clients() {
 
   const fetchClients = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/clients${teacherQuery}`);
+      const response = await axios.get(`/api/clients${teacherQuery}`);
       setClients(response.data);
     } catch (error) {
       console.error('Failed to fetch clients:', error);
@@ -88,7 +87,7 @@ export default function Clients() {
     if (!confirm('Вы уверены, что хотите удалить этого клиента?')) return;
 
     try {
-      await axios.delete(`${API_URL}/api/clients/${id}`);
+      await axios.delete(`/api/clients/${id}`);
       setClients(clients.filter((c) => c.id !== id));
     } catch (error: any) {
       alert(error.response?.data?.error || 'Ошибка при удалении клиента');

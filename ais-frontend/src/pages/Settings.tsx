@@ -1,6 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { AlertCircle, CalendarDays, CheckCircle2, Clock, ExternalLink, KeyRound, LayoutGrid, Mail, MessageCircle, Navigation, QrCode, RefreshCw, Save, SlidersHorizontal, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppUser, getTeacherOptions, getUserLabel } from '../utils/admin';
@@ -208,7 +207,7 @@ export default function Settings() {
   }, [isAdmin, selectedTeacher?.address, selectedTeacher?.telegramChatId, user?.address, user?.telegramChatId]);
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/telegram/bot-info`)
+    axios.get(`/api/telegram/bot-info`)
       .then((response) => setBotInfo(response.data))
       .catch((error) => console.error('Ошибка загрузки данных Telegram-бота:', error));
   }, []);
@@ -216,7 +215,7 @@ export default function Settings() {
   const fetchWeights = async () => {
     try {
       const userId = String(targetUserId);
-      const response = await axios.get(`${API_URL}/api/slot-weights/${userId}`);
+      const response = await axios.get(`/api/slot-weights/${userId}`);
 
       if (response.data && typeof response.data === 'object') {
         setWeights({
@@ -241,7 +240,7 @@ export default function Settings() {
 
   useEffect(() => {
     if (isAdmin) {
-      axios.get(`${API_URL}/api/users`)
+      axios.get(`/api/users`)
         .then((response) => {
           const teachers = getTeacherOptions(response.data);
           setUsers(response.data);
@@ -276,7 +275,7 @@ export default function Settings() {
     try {
       const userId = String(targetUserId);
 
-      await axios.put(`${API_URL}/api/slot-weights/${userId}`, weights);
+      await axios.put(`/api/slot-weights/${userId}`, weights);
       alert('Настройки успешно сохранены');
     } catch (error: any) {
       const errorMessage = error.response?.data?.error ||
@@ -299,7 +298,7 @@ export default function Settings() {
     setProfileMessage(null);
 
     try {
-      const response = await axios.put(`${API_URL}/api/users/${targetUserId}`, {
+      const response = await axios.put(`/api/users/${targetUserId}`, {
         address: profileAddress,
       });
 
@@ -334,7 +333,7 @@ export default function Settings() {
     setEmailVerificationError(null);
 
     try {
-      const response = await axios.post(`${API_URL}/api/auth/email-verification/request`);
+      const response = await axios.post(`/api/auth/email-verification/request`);
       setEmailVerificationMessage(response.data?.message || 'Письмо для подтверждения email отправлено.');
       await refreshUser();
     } catch (error: any) {
@@ -351,7 +350,7 @@ export default function Settings() {
     }
 
     try {
-      const response = await axios.get(`${API_URL}/api/users/${targetUserId}`);
+      const response = await axios.get(`/api/users/${targetUserId}`);
       const nextChatId = response.data.telegramChatId || '';
 
       if (isAdmin) {
@@ -391,7 +390,7 @@ export default function Settings() {
     setPasswordLoading(true);
 
     try {
-      const response = await axios.patch(`${API_URL}/api/auth/password`, passwordForm);
+      const response = await axios.patch(`/api/auth/password`, passwordForm);
       const message = response.data?.message || 'Пароль успешно изменен';
 
       setPasswordForm({

@@ -1,7 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 
 
 export default function ForgotPassword() {
@@ -17,7 +16,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API_URL}/api/auth/forgot-password`, { email });
+      const response = await axios.post(`/api/auth/forgot-password`, { email });
       setMessage(response.data?.message || 'Письмо со ссылкой для сброса пароля отправлено.');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Письмо для сброса пароля не отправлено');

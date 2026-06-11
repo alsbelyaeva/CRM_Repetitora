@@ -1,7 +1,6 @@
 // src/contexts/AuthContext.tsx
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 
 interface User {
   id: string;
@@ -47,8 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUser = async (): Promise<User | null> => {
     try {
-      console.log('🔍 Извлечение пользователя из:', `${API_URL}/api/auth/me`);
-      const response = await axios.get(`${API_URL}/api/auth/me`);
+      console.log('🔍 Извлечение пользователя из:', `/api/auth/me`);
+      const response = await axios.get(`/api/auth/me`);
       console.log('✅ User fetched:', response.data);
       setUser(response.data);
       return response.data;
@@ -66,8 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      console.log('🔐 Вход в систему для:', `${API_URL}/api/auth/login`);
-      const response = await axios.post(`${API_URL}/api/auth/login`, { email, password });
+      console.log('🔐 Вход в систему для:', `/api/auth/login`);
+      const response = await axios.post(`/api/auth/login`, { email, password });
       console.log('✅ Ответ на вход в систему:', response.data);
       
       const { token: newToken, user: userData } = response.data;

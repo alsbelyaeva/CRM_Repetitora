@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { Users, Shield, ShieldOff, Mail, Calendar, MessageCircle, CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -38,7 +37,7 @@ export default function AdminUsers() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/users`);
+      const response = await axios.get(`/api/users`);
       setUsers(response.data);
     } catch (error) {
       console.error('Failed to fetch users:', error);
@@ -62,7 +61,7 @@ export default function AdminUsers() {
     }
 
     try {
-      await axios.put(`${API_URL}/api/users/${userId}`, { role: newRole });
+      await axios.put(`/api/users/${userId}`, { role: newRole });
       alert(`Права успешно ${newRole === 'ADMIN' ? 'выданы' : 'отозваны'}`);
       setSelectedUser(null);
       fetchUsers();

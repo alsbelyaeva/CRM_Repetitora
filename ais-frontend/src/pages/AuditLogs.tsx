@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { ClipboardList, RefreshCw, User as UserIcon } from 'lucide-react';
-import { API_URL } from '../utils/apiBase';
 
 interface User {
   id: string;
@@ -125,7 +124,7 @@ export default function AuditLogs() {
   }, [selectedUserId, users]);
 
   const fetchUsers = async () => {
-    const response = await axios.get<User[]>(`${API_URL}/api/users`);
+    const response = await axios.get<User[]>(`/api/users`);
     setUsers(response.data);
   };
 
@@ -143,7 +142,7 @@ export default function AuditLogs() {
         params.set('userId', selectedUserId);
       }
 
-      const response = await axios.get<AuditLogsResponse>(`${API_URL}/api/audit-logs?${params.toString()}`);
+      const response = await axios.get<AuditLogsResponse>(`/api/audit-logs?${params.toString()}`);
       setLogs(response.data.items || []);
       setTotal(response.data.total || 0);
     } catch (err: any) {

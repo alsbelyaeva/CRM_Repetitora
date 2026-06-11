@@ -22,13 +22,32 @@ const app = express();
 const defaultOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'http://192.168.31.106:5173',
 ];
 
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
+
+const frontendUrl = process.env.FRONTEND_URL?.trim();
+
+function getHostnameFromHeader(value: string | string[] | undefined) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  if (!rawValue) return '';
+  return rawValue.split(',')[0].trim().replace(/:\d+$/, '');
+}
+
+function isSameHostOrigin(origin: string, req: express.Request) {
+  try {
+    const originHost = new URL(origin).hostname;
+    const forwardedHost = getHostnameFromHeader(req.headers['x-forwarded-host']);
+    const host = getHostnameFromHeader(req.headers.host);
+
+    return Boolean(originHost && (originHost === forwardedHost || originHost === host));
+  } catch {
+    return false;
+  }
+}
 
 function isAllowedDevOrigin(origin: string) {
   try {
@@ -48,15 +67,20 @@ function isAllowedDevOrigin(origin: string) {
   }
 }
 
-app.use(cors({
+app.use((req, res, next) => cors({
   origin(origin, callback) {
     if (!origin) {
       callback(null, true);
       return;
     }
 
-    const configuredOrigins = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
-    if (configuredOrigins.includes(origin) || isAllowedDevOrigin(origin)) {
+    const configuredOrigins = [
+      ...defaultOrigins,
+      ...allowedOrigins,
+      ...(frontendUrl ? [frontendUrl] : []),
+    ];
+
+    if (configuredOrigins.includes(origin) || isAllowedDevOrigin(origin) || isSameHostOrigin(origin, req)) {
       callback(null, true);
       return;
     }
@@ -66,7 +90,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+})(req, res, next));
 
 app.use(express.json());
 

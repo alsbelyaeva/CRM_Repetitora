@@ -54,7 +54,6 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: ${VITE_API_URL:-}
       VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://backend:4000}
     depends_on:
       - backend

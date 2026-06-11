@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { AlertCircle, CheckCircle2, Mail } from 'lucide-react';
-import { API_URL } from '../utils/apiBase';
 import { useAuth } from '../contexts/AuthContext';
 
 type VerificationState = 'loading' | 'success' | 'error';
@@ -22,7 +21,7 @@ export default function VerifyEmail() {
       return;
     }
 
-    axios.post(`${API_URL}/api/auth/email-verification/confirm`, { token })
+    axios.post(`/api/auth/email-verification/confirm`, { token })
       .then(async (response) => {
         setState('success');
         setMessage(response.data?.message || 'Email успешно подтверждён.');

@@ -1,7 +1,6 @@
 // src/pages/Dashboard.tsx
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { Users, Calendar, DollarSign, TrendingUp, MessageCircle, ExternalLink, QrCode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -39,12 +38,12 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       const [clientsRes, lessonsRes, paymentsRes, requestsRes, botInfoRes, meRes] = await Promise.all([
-        axios.get(`${API_URL}/api/clients`),
-        axios.get(`${API_URL}/api/lessons`),
-        axios.get(`${API_URL}/api/payments`),
-        axios.get(`${API_URL}/api/slot-requests`),
-        axios.get(`${API_URL}/api/telegram/bot-info`).catch(() => ({ data: null })),
-        axios.get(`${API_URL}/api/auth/me`).catch(() => ({ data: user })),
+        axios.get(`/api/clients`),
+        axios.get(`/api/lessons`),
+        axios.get(`/api/payments`),
+        axios.get(`/api/slot-requests`),
+        axios.get(`/api/telegram/bot-info`).catch(() => ({ data: null })),
+        axios.get(`/api/auth/me`).catch(() => ({ data: user })),
       ]);
 
       const now = new Date();

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { API_URL } from '../utils/apiBase';
 import { Plus, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppUser, getTeacherOptions, getUserLabel } from '../utils/admin';
@@ -63,7 +62,7 @@ export default function Payments() {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/users`);
+      const response = await axios.get(`/api/users`);
       setUsers(response.data);
     } catch (error) {
       console.error('Failed to fetch users:', error);
@@ -72,7 +71,7 @@ export default function Payments() {
 
   const fetchPayments = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/payments${teacherQuery}`);
+      const response = await axios.get(`/api/payments${teacherQuery}`);
       setPayments(response.data);
     } catch (error) {
       console.error('Failed to fetch payments:', error);
@@ -81,7 +80,7 @@ export default function Payments() {
 
   const fetchClients = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/clients${teacherQuery}`);
+      const response = await axios.get(`/api/clients${teacherQuery}`);
       setClients(response.data);
     } catch (error) {
       console.error('Failed to fetch clients:', error);
@@ -90,7 +89,7 @@ export default function Payments() {
 
   const fetchLessons = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/lessons${teacherQuery}`);
+      const response = await axios.get(`/api/lessons${teacherQuery}`);
       setLessons(response.data);
     } catch (error) {
       console.error('Failed to fetch lessons:', error);
@@ -125,7 +124,7 @@ export default function Payments() {
         submitData.lessonId = parseInt(formData.lessonId);
       }
 
-      await axios.post(`${API_URL}/api/payments`, submitData);
+      await axios.post(`/api/payments`, submitData);
       setShowModal(false);
       fetchPayments();
       resetForm();
