@@ -247,10 +247,10 @@ export default function Payments() {
               <th className="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
               <th className={isAdmin ? 'w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase' : 'w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase'}>Клиент</th>
               {isAdmin && <th className="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Преподаватель</th>}
-              <th className="w-[13%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Урок</th>
-              <th className="w-[11%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сумма</th>
-              <th className="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Метод</th>
-              <th className={isAdmin ? 'w-[26%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase' : 'w-[36%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase'}>Примечание</th>
+              <th className="w-[14%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Урок</th>
+              <th className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сумма</th>
+              <th className="w-[14%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Метод</th>
+              <th className={isAdmin ? 'w-[24%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase' : 'w-[34%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase'}>Примечание</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -299,11 +299,11 @@ export default function Payments() {
                       })()
                     ) : '—'}
                   </td>
-                  <td className="px-4 py-4 font-semibold text-green-600 align-top">
+                  <td className="px-3 py-4 font-semibold text-green-600 align-top whitespace-nowrap">
                     {parseFloat(payment.amount).toFixed(2)} ₽
                   </td>
-                  <td className="px-4 py-4 text-sm align-top">
-                    <span className="break-words">{payment.method}</span>
+                  <td className="px-3 py-4 text-sm align-top">
+                    <span className="whitespace-nowrap">{payment.method}</span>
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-600 align-top">
                     <div className="break-words leading-snug line-clamp-3" title={payment.note || undefined}>
