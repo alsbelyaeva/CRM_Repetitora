@@ -1264,16 +1264,20 @@ export default function SlotRequests() {
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
                               {getScoreCards(displaySlot).map(card => (
-                                <div key={card.key} className={`${card.bg} p-3 rounded-lg border ${card.border}`}>
-                                  <div className="flex items-baseline justify-between gap-3">
-                                    <div className={`inline-flex items-center gap-1 text-sm font-semibold ${card.text}`}>
-                                      {card.warning && <AlertTriangle className="w-4 h-4" />}
-                                      {card.label}
+                                <div key={card.key} className={`${card.bg} min-w-0 p-3 rounded-lg border ${card.border}`}>
+                                  <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+                                    <div className={`flex min-w-0 items-start gap-1 text-sm font-semibold leading-snug ${card.text}`}>
+                                      {card.warning && <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
+                                      <span className="min-w-0 break-words">{card.label}</span>
                                     </div>
-                                    <div className={`text-lg font-bold ${card.text}`}>{card.value.toFixed(2)}</div>
+                                    <div className={`shrink-0 text-base sm:text-lg font-bold leading-none ${card.text}`}>
+                                      {card.value.toFixed(2)}
+                                    </div>
                                   </div>
                                   {card.detail && (
-                                    <div className="text-xs text-gray-700 mt-2 leading-snug">{capitalizeExplanation(card.detail)}</div>
+                                    <div className="min-w-0 text-xs text-gray-700 mt-2 leading-snug break-words">
+                                      {capitalizeExplanation(card.detail)}
+                                    </div>
                                   )}
                                 </div>
                               ))}
