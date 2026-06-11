@@ -153,6 +153,14 @@ export default function Payments() {
     return `${date.toLocaleDateString('ru-RU')} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} - ${lesson.type}`;
   };
 
+  const formatDateParts = (value: string) => {
+    const date = new Date(value);
+    return {
+      date: date.toLocaleDateString('ru-RU'),
+      time: date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+    };
+  };
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 md:mb-8">
@@ -232,17 +240,17 @@ export default function Payments() {
         )}
       </div>
 
-      <div className="hidden md:block bg-white rounded-lg shadow overflow-x-auto">
-        <table className="w-full">
+      <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full table-fixed">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Клиент</th>
-              {isAdmin && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Преподаватель</th>}
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Урок</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сумма</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Метод</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Примечание</th>
+              <th className="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Дата</th>
+              <th className={isAdmin ? 'w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase' : 'w-[20%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase'}>Клиент</th>
+              {isAdmin && <th className="w-[15%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Преподаватель</th>}
+              <th className="w-[13%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Урок</th>
+              <th className="w-[11%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Сумма</th>
+              <th className="w-[10%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Метод</th>
+              <th className={isAdmin ? 'w-[26%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase' : 'w-[36%] px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase'}>Примечание</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -255,31 +263,53 @@ export default function Payments() {
             ) : (
               payments.map((payment) => (
                 <tr key={payment.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {new Date(payment.dateTime).toLocaleString('ru-RU')}
+                  <td className="px-4 py-4 text-sm align-top">
+                    {(() => {
+                      const parts = formatDateParts(payment.dateTime);
+                      return (
+                        <div className="leading-tight">
+                          <div className="font-medium text-gray-900">{parts.date}</div>
+                          <div className="mt-1 text-xs text-gray-500">{parts.time}</div>
+                        </div>
+                      );
+                    })()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{payment.client.fullName}</td>
+                  <td className="px-4 py-4 align-top">
+                    <div className="text-sm font-medium text-gray-900 break-words leading-snug">
+                      {payment.client.fullName}
+                    </div>
+                  </td>
                   {isAdmin && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {payment.client.user ? getUserLabel(payment.client.user as AppUser) : '—'}
+                    <td className="px-4 py-4 text-sm text-gray-600 align-top">
+                      <div className="break-words leading-snug">
+                        {payment.client.user ? getUserLabel(payment.client.user as AppUser) : '—'}
+                      </div>
                     </td>
                   )}
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {payment.lesson ? 
-                      new Date(payment.lesson.startTime).toLocaleString('ru-RU', { 
-                        day: '2-digit', 
-                        month: '2-digit', 
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) 
-                      : '—'}
+                  <td className="px-4 py-4 text-sm text-gray-600 align-top">
+                    {payment.lesson ? (
+                      (() => {
+                        const parts = formatDateParts(payment.lesson!.startTime);
+                        return (
+                          <div className="leading-tight">
+                            <div>{parts.date}</div>
+                            <div className="mt-1 text-xs text-gray-500">{parts.time}</div>
+                          </div>
+                        );
+                      })()
+                    ) : '—'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap font-semibold text-green-600">
+                  <td className="px-4 py-4 font-semibold text-green-600 align-top">
                     {parseFloat(payment.amount).toFixed(2)} ₽
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">{payment.method}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{payment.note || '—'}</td>
+                  <td className="px-4 py-4 text-sm align-top">
+                    <span className="break-words">{payment.method}</span>
+                  </td>
+                  <td className="px-4 py-4 text-sm text-gray-600 align-top">
+                    <div className="break-words leading-snug line-clamp-3" title={payment.note || undefined}>
+                      {payment.note || '—'}
+                    </div>
+                  </td>
                 </tr>
               ))
             )}
