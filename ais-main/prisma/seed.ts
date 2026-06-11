@@ -81,9 +81,9 @@ async function main() {
         maxTravelMinutes: 60,
         workingDays: [1, 2, 3, 4, 5],
         preferredTimes: {
-          morning: { enabled: true, score: 0.6 },
-          afternoon: { enabled: true, score: 0.9 },
-          evening: { enabled: true, score: 0.7 },
+          morning: { period: 'morning', enabled: true, weight: 0.6 },
+          day: { period: 'day', enabled: true, weight: 0.9 },
+          evening: { period: 'evening', enabled: true, weight: 0.7 },
         },
       },
       {
@@ -99,9 +99,9 @@ async function main() {
         maxTravelMinutes: 45,
         workingDays: [1, 2, 3, 4, 5, 6],
         preferredTimes: {
-          morning: { enabled: true, score: 0.4 },
-          afternoon: { enabled: true, score: 0.8 },
-          evening: { enabled: true, score: 0.9 },
+          morning: { period: 'morning', enabled: true, weight: 0.4 },
+          day: { period: 'day', enabled: true, weight: 0.8 },
+          evening: { period: 'evening', enabled: true, weight: 0.9 },
         },
       },
     ],

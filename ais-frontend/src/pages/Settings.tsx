@@ -120,6 +120,40 @@ const CRITERIA: Array<{
   },
 ];
 
+const normalizeTimePreference = (
+  key: TimePeriodKey,
+  value: any,
+): TimePreference => {
+  const fallback = DEFAULT_WEIGHTS.preferredTimes[key];
+  const weight = Number(value?.weight ?? value?.score ?? fallback.weight);
+
+  return {
+    period: key,
+    enabled: typeof value?.enabled === 'boolean' ? value.enabled : fallback.enabled,
+    weight: Number.isFinite(weight) ? weight : fallback.weight,
+  };
+};
+
+const normalizePreferredTimes = (value: any): Weights['preferredTimes'] => {
+  const source = value && typeof value === 'object' ? value : {};
+
+  return {
+    morning: normalizeTimePreference('morning', source.morning),
+    day: normalizeTimePreference('day', source.day ?? source.afternoon),
+    evening: normalizeTimePreference('evening', source.evening),
+  };
+};
+
+const normalizeWorkingDays = (value: any): number[] => {
+  if (!Array.isArray(value)) return DEFAULT_WEIGHTS.workingDays;
+
+  const days = value
+    .map(day => Number(day))
+    .filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
+
+  return days.length > 0 ? days : DEFAULT_WEIGHTS.workingDays;
+};
+
 export default function Settings() {
   const { user, refreshUser } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
@@ -191,8 +225,8 @@ export default function Settings() {
           wWorkingDay: response.data.wWorkingDay ?? DEFAULT_WEIGHTS.wWorkingDay,
           wPriority: response.data.wPriority ?? DEFAULT_WEIGHTS.wPriority,
           wTravel: response.data.wTravel ?? DEFAULT_WEIGHTS.wTravel,
-          workingDays: response.data.workingDays || DEFAULT_WEIGHTS.workingDays,
-          preferredTimes: response.data.preferredTimes || DEFAULT_WEIGHTS.preferredTimes,
+          workingDays: normalizeWorkingDays(response.data.workingDays),
+          preferredTimes: normalizePreferredTimes(response.data.preferredTimes),
           minGapMinutes: response.data.minGapMinutes || DEFAULT_WEIGHTS.minGapMinutes,
           maxGapMinutes: response.data.maxGapMinutes || DEFAULT_WEIGHTS.maxGapMinutes,
           desiredBreakMinutes: response.data.desiredBreakMinutes ?? DEFAULT_WEIGHTS.desiredBreakMinutes,
