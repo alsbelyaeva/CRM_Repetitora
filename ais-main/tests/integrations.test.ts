@@ -5,7 +5,7 @@ import { withoutEnv } from './utils/env';
 
 describe('External integrations graceful degradation', () => {
   it('Telegram без TELEGRAM_BOT_TOKEN пропускает отправку без исключения', async () => {
-    const service = new TelegramNotificationService(undefined);
+    const service = new TelegramNotificationService('');
     const result = await service.sendLessonReminder({
       chatId: '123',
       recipientLabel: 'Преподаватель',
