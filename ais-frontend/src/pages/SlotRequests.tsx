@@ -1211,7 +1211,7 @@ export default function SlotRequests() {
                             : 'border-gray-300 bg-white hover:shadow-md'
                         }`}
                       >
-                        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+                        <div className="flex flex-col gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-3">
                               <span className={`font-bold text-lg ${itemCancelled ? 'line-through decoration-gray-400' : ''}`}>
@@ -1262,20 +1262,22 @@ export default function SlotRequests() {
                               </p>
                             )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-2">
                               {getScoreCards(displaySlot).map(card => (
                                 <div key={card.key} className={`${card.bg} min-w-0 p-3 rounded-lg border ${card.border}`}>
-                                  <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
-                                    <div className={`flex min-w-0 items-start gap-1 text-sm font-semibold leading-snug ${card.text}`}>
-                                      {card.warning && <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
-                                      <span className="min-w-0 break-words">{card.label}</span>
-                                    </div>
-                                    <div className={`shrink-0 text-base sm:text-lg font-bold leading-none ${card.text}`}>
-                                      {card.value.toFixed(2)}
+                                  <div className={`flex min-w-0 items-start gap-2 ${card.text}`}>
+                                    {card.warning && <AlertTriangle className="w-4 h-4 mt-1 shrink-0" />}
+                                    <div className="min-w-0">
+                                      <div className="text-xl font-bold leading-tight">
+                                        {card.value.toFixed(2)}
+                                      </div>
+                                      <div className="mt-1 text-sm font-semibold leading-snug whitespace-normal break-normal">
+                                        {card.label}
+                                      </div>
                                     </div>
                                   </div>
                                   {card.detail && (
-                                    <div className="min-w-0 text-xs text-gray-700 mt-2 leading-snug break-words">
+                                    <div className="min-w-0 text-xs text-gray-700 mt-2 leading-snug whitespace-normal break-normal">
                                       {capitalizeExplanation(card.detail)}
                                     </div>
                                   )}
@@ -1284,23 +1286,23 @@ export default function SlotRequests() {
                             </div>
                           </div>
 
-                          <div className="flex w-full lg:w-auto lg:min-w-40 flex-col gap-2">
+                          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                             {itemCancelled ? (
                               <button
                                 onClick={() => restoreSlot(req.requestId, req.slotIndex)}
-                                className="flex items-center justify-center px-4 py-3 lg:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold whitespace-nowrap"
+                                className="flex w-full sm:w-auto items-center justify-center px-4 py-3 lg:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold whitespace-nowrap"
                               >
                                 <RotateCcw className="w-4 h-4 mr-2" />
                                 Вернуть
                               </button>
                             ) : itemConfirmed ? (
                               <>
-                                <span className="px-4 py-3 lg:py-2 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-center whitespace-nowrap">
+                                <span className="w-full sm:w-auto px-4 py-3 lg:py-2 bg-emerald-100 text-emerald-800 rounded-lg font-semibold text-center whitespace-nowrap">
                                   Подтверждено
                                 </span>
                                 <button
                                   onClick={() => cancelSelectedSlot(req.requestId, req.slotIndex)}
-                                  className="px-4 py-3 lg:py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold whitespace-nowrap"
+                                  className="w-full sm:w-auto px-4 py-3 lg:py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold whitespace-nowrap"
                                 >
                                   Отменить выбор
                                 </button>
@@ -1310,7 +1312,7 @@ export default function SlotRequests() {
                                 <button
                                   onClick={() => createLessonForClient(req.requestId, req.slotIndex, req.clientId, req.slot)}
                                   disabled={isEventConflict}
-                                  className={`px-4 py-3 lg:py-2 rounded-lg font-semibold whitespace-nowrap transition-colors ${
+                                  className={`w-full sm:w-auto px-4 py-3 lg:py-2 rounded-lg font-semibold whitespace-nowrap transition-colors ${
                                     isEventConflict
                                       ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
                                       : req.slot.hasConflict
@@ -1323,7 +1325,7 @@ export default function SlotRequests() {
 
                                 <button
                                   onClick={() => rejectSlot(req.requestId, req.slotIndex)}
-                                  className="px-4 py-3 lg:py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
+                                  className="w-full sm:w-auto px-4 py-3 lg:py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold"
                                 >
                                   Отклонить
                                 </button>
