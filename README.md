@@ -171,7 +171,7 @@ copy .env.example .env
 3. Запустить проект:
 
 ```powershell
-docker compose up --build
+docker compose up -d --build
 ```
 
 При запуске через Docker backend автоматически применяет Prisma-миграции перед стартом приложения. Если для локальной разработки уже есть `ais-main/.env`, Docker тоже подхватит его значения, но корневой `.env` считается основным файлом для развертывания.
@@ -201,6 +201,12 @@ npm run seed
 В seed создаются учетные записи администратора, преподавателей, клиентов и демонстрационные данные для проверки функций.
 
 Для Docker-запуска seed можно применить после старта контейнеров:
+
+```powershell
+docker compose logs -f backend frontend
+```
+
+Перед запуском seed дождитесь в логах backend строки `Server running on http://0.0.0.0:4000`, а в логах frontend строки с адресом `http://localhost:5173`. После этого остановите просмотр логов через `Ctrl+C` и выполните:
 
 ```powershell
 docker compose exec backend npm run seed

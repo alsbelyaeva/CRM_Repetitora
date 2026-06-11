@@ -24,7 +24,7 @@ services:
         required: false
     volumes:
       - ./ais-main:/app
-    command: sh -c "npm install && npx prisma generate && until npx prisma migrate deploy; do echo 'Waiting for database migrations...'; sleep 2; done && npm run dev"
+    command: sh -c "npm install --include=dev && npx prisma generate && until npx prisma migrate deploy; do echo 'Waiting for database migrations...'; sleep 2; done && npm run dev"
     ports:
       - "4000:4000"
       - "5557:5557"
@@ -50,7 +50,7 @@ services:
         required: false
     volumes:
       - ./ais-frontend:/app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    command: sh -c "npm install --include=dev && npm run dev -- --host 0.0.0.0"
     ports:
       - "5173:5173"
     environment:
