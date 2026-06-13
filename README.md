@@ -155,6 +155,7 @@ TELEGRAM_BOT_USERNAME=
 TWO_GIS_API_KEY=
 
 VITE_PROXY_TARGET=http://backend:4000
+VITE_ALLOWED_HOSTS=
 ```
 
 ## Запуск через Docker
@@ -194,6 +195,14 @@ Reverse proxy на сервере должен направлять:
 - все остальные запросы на frontend, например `http://frontend:5173`.
 
 В локальной разработке Vite проксирует `/api` на backend через `VITE_PROXY_TARGET`. Для Docker значение по умолчанию: `http://backend:4000`.
+
+Если временно используется Vite dev server за reverse proxy и запрос приходит по локальным DNS-именам, их можно перечислить в `VITE_ALLOWED_HOSTS`:
+
+```env
+VITE_ALLOWED_HOSTS=test.lan,nginx.lan,crmrepetitora.obl1ab.ru
+```
+
+Для production-сборки через `npm run build` эта настройка не нужна: frontend должен отдаваться как статические файлы.
 
 Для production рекомендуется указать:
 
