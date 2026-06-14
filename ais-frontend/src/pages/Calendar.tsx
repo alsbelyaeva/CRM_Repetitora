@@ -45,31 +45,62 @@ type CalendarItem =
   | { kind: 'lesson'; id: number; startTime: string; durationMin: number; status: string; title: string; lesson: Lesson }
   | { kind: 'event'; id: number; startTime: string; durationMin: number; status: string; title: string; event: ScheduleEvent };
 
+const APP_TIME_ZONE = 'Europe/Moscow';
+
 const eventTypes = [
   { value: 'PERSONAL', label: 'Личное' },
   { value: 'OTHER', label: 'Другое' },
 ];
 
+function getAppDateTimeParts(date: Date) {
+  const parts = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find(part => part.type === type)?.value || '';
+
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour: get('hour') === '24' ? '00' : get('hour'),
+    minute: get('minute'),
+  };
+}
+
 function dateToInputValue(date: Date) {
+  const parts = getAppDateTimeParts(date);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function calendarDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function timeToInputValue(date: Date) {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const parts = getAppDateTimeParts(date);
+  return `${parts.hour}:${parts.minute}`;
 }
 
-function startOfLocalDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+function getAppIsoWeekday(date: Date) {
+  const appDate = new Date(`${dateToInputValue(date)}T00:00:00`);
+  return ((appDate.getDay() + 6) % 7) + 1;
 }
 
 function isFutureCalendarDay(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value);
-  return startOfLocalDay(date).getTime() > startOfLocalDay(new Date()).getTime();
+  return dateToInputValue(date) > dateToInputValue(new Date());
 }
 
 function isPastCalendarDay(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value);
-  return startOfLocalDay(date).getTime() < startOfLocalDay(new Date()).getTime();
+  return dateToInputValue(date) < dateToInputValue(new Date());
 }
 
 function isGroupLessonType(type: string) {
@@ -300,8 +331,8 @@ export default function Calendar() {
   const formatLessonTime = (startTime: string, durationMin: number) => {
     const start = new Date(startTime);
     const end = new Date(start.getTime() + durationMin * 60 * 1000);
-    const startStr = start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    const endStr = end.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const startStr = start.toLocaleTimeString('ru-RU', { timeZone: APP_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
+    const endStr = end.toLocaleTimeString('ru-RU', { timeZone: APP_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
     return `${startStr} - ${endStr}`;
   };
 
@@ -403,7 +434,7 @@ export default function Calendar() {
         const errorData = error.response.data;
         const conflictItems = errorData.conflictingLessons || errorData.conflicts || (errorData.conflict ? [errorData.conflict] : []);
         const conflictingItems = conflictItems.map((item: any) =>
-          `${item.clientName || item.title || 'Занято'} (${new Date(item.startTime || item.occurrence).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })})`
+          `${item.clientName || item.title || 'Занято'} (${new Date(item.startTime || item.occurrence).toLocaleTimeString('ru-RU', { timeZone: APP_TIME_ZONE, hour: '2-digit', minute: '2-digit' })})`
         ).join(', ');
         alert(`❌ ${errorData.error}\n\n${errorData.message || `Это время занято: ${conflictingItems}`}\n\nПожалуйста, выберите другое время.`);
       } else {
@@ -507,7 +538,7 @@ export default function Calendar() {
       status: lesson.status,
       notes: lesson.notes || '',
       repeatEnabled: false,
-      repeatWeekday: ((start.getDay() + 6) % 7) + 1,
+      repeatWeekday: getAppIsoWeekday(start),
       repeatMode: 'count',
       repeatCount: 8,
       repeatUntil: '',
@@ -583,10 +614,7 @@ export default function Calendar() {
   ].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   const getItemsForDay = (date: Date) => toCalendarItems().filter((item) => {
-    const itemDate = new Date(item.startTime);
-    return itemDate.getDate() === date.getDate() &&
-      itemDate.getMonth() === date.getMonth() &&
-      itemDate.getFullYear() === date.getFullYear();
+    return dateToInputValue(new Date(item.startTime)) === calendarDateKey(date);
   });
 
   const getStatusColor = (item: CalendarItem) => {
@@ -1103,7 +1131,16 @@ export default function Calendar() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Время</p>
-                <p className="font-semibold">{new Date(selectedLesson.startTime).toLocaleString('ru-RU')}</p>
+                <p className="font-semibold">
+                  {new Date(selectedLesson.startTime).toLocaleString('ru-RU', {
+                    timeZone: APP_TIME_ZONE,
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
                 <p className="text-sm">{formatLessonTime(selectedLesson.startTime, selectedLesson.durationMin)}</p>
               </div>
               <div><p className="text-sm text-gray-600">Тип</p><p className="font-semibold">{normalizeLessonTypeForForm(selectedLesson.type)}{selectedLesson.recurringSeriesId ? ' · регулярное' : ''}</p></div>
