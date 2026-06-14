@@ -120,6 +120,9 @@ components:
           format: decimal
         method:
           type: string
+          enum:
+            - Наличные
+            - Перевод
         dateTime:
           type: string
           format: date-time
@@ -601,6 +604,9 @@ paths:
                   format: decimal
                 method:
                   type: string
+                  enum:
+                    - Наличные
+                    - Перевод
                 dateTime:
                   type: string
                   format: date-time

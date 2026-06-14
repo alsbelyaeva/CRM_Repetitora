@@ -24,7 +24,7 @@ describe('Payments API', () => {
         clientId: seed.client.id,
         lessonId: seed.lesson.id,
         amount: 2000,
-        method: 'card',
+        method: 'Перевод',
         dateTime: '2026-05-11T12:00:00+03:00',
         note: 'Тестовая оплата API',
       });

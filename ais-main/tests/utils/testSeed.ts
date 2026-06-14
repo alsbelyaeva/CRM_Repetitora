@@ -85,7 +85,7 @@ export async function seedTestData() {
       clientId: client.id,
       lessonId: lesson.id,
       amount: 1500,
-      method: 'cash',
+      method: 'Наличные',
       dateTime: new Date('2026-06-11T11:00:00+03:00'),
       note: 'Тестовая оплата',
     },

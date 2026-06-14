@@ -156,7 +156,7 @@ describe('Audit Logs API', () => {
         clientId: seed.client.id,
         lessonId: seed.lesson.id,
         amount: 1200,
-        method: 'cash',
+        method: 'Наличные',
         dateTime: '2026-06-11T11:30:00+03:00',
       });
 

@@ -386,7 +386,6 @@ export default function Payments() {
                   className="w-full px-4 py-3 md:py-2 border rounded-lg"
                 >
                   <option>Наличные</option>
-                  <option>Карта</option>
                   <option>Перевод</option>
                 </select>
               </div>

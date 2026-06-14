@@ -2,6 +2,18 @@ import { Request, Response } from 'express';
 import prisma from '../utils/prismaClient';
 import { getChangedFields, logAuditAction } from '../services/auditLogService';
 
+const PAYMENT_METHODS = ['Наличные', 'Перевод'] as const;
+
+function normalizePaymentMethod(value: unknown) {
+  const method = String(value || '').trim();
+  const normalized = method.toLowerCase();
+
+  if (['наличные', 'нал', 'cash'].includes(normalized)) return 'Наличные';
+  if (['перевод', 'карта', 'картой', 'card', 'transfer'].includes(normalized)) return 'Перевод';
+
+  return PAYMENT_METHODS.includes(method as typeof PAYMENT_METHODS[number]) ? method : '';
+}
+
 // Создать оплату
 export const create = async (req: Request, res: Response) => {
   try {
@@ -15,8 +27,13 @@ export const create = async (req: Request, res: Response) => {
     const data = {
       ...req.body,
       amount: Number(req.body.amount),
+      method: normalizePaymentMethod(req.body.method),
       dateTime: new Date(req.body.dateTime || new Date()),
     };
+
+    if (!data.method) {
+      return res.status(400).json({ error: 'Некорректный метод оплаты. Используйте: Наличные или Перевод' });
+    }
 
     // Проверяем существование клиента
     const client = await prisma.client.findUnique({
@@ -310,7 +327,11 @@ export const update = async (req: Request, res: Response) => {
       updateData.dateTime = new Date(req.body.dateTime);
     }
     if (req.body.method !== undefined) {
-      updateData.method = req.body.method;
+      const method = normalizePaymentMethod(req.body.method);
+      if (!method) {
+        return res.status(400).json({ error: 'Некорректный метод оплаты. Используйте: Наличные или Перевод' });
+      }
+      updateData.method = method;
     }
     if (req.body.notes !== undefined) {
       updateData.notes = req.body.notes;
