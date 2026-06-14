@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { AlertCircle, CheckCircle2, Mail } from 'lucide-react';
@@ -11,6 +11,7 @@ export default function VerifyEmail() {
   const { user, refreshUser } = useAuth();
   const [state, setState] = useState<VerificationState>('loading');
   const [message, setMessage] = useState('Проверяем ссылку подтверждения...');
+  const processedTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -20,6 +21,12 @@ export default function VerifyEmail() {
       setMessage('В ссылке подтверждения отсутствует token.');
       return;
     }
+
+    if (processedTokenRef.current === token) {
+      return;
+    }
+
+    processedTokenRef.current = token;
 
     axios.post(`/api/auth/email-verification/confirm`, { token })
       .then(async (response) => {

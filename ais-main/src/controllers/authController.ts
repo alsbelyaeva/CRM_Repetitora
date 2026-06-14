@@ -428,18 +428,38 @@ export async function verifyEmail(req: Request, res: Response) {
       },
     });
 
-    if (!verificationToken || verificationToken.usedAt) {
+    if (!verificationToken) {
       return res.status(400).json({ error: 'Ссылка подтверждения недействительна или уже использована' });
-    }
-
-    if (verificationToken.expiresAt < new Date()) {
-      return res.status(400).json({ error: 'Срок действия ссылки подтверждения истёк' });
     }
 
     if (normalizeEmail(verificationToken.email) !== normalizeEmail(verificationToken.user.email)) {
       return res.status(400).json({
         error: 'Email аккаунта изменился после отправки письма. Запросите новую ссылку подтверждения.',
       });
+    }
+
+    if (verificationToken.usedAt) {
+      if (verificationToken.user.emailVerifiedAt) {
+        return res.json({
+          message: 'Email уже подтверждён.',
+          emailVerified: true,
+          emailVerifiedAt: verificationToken.user.emailVerifiedAt,
+        });
+      }
+
+      return res.status(400).json({ error: 'Ссылка подтверждения недействительна или уже использована' });
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      if (verificationToken.user.emailVerifiedAt) {
+        return res.json({
+          message: 'Email уже подтверждён.',
+          emailVerified: true,
+          emailVerifiedAt: verificationToken.user.emailVerifiedAt,
+        });
+      }
+
+      return res.status(400).json({ error: 'Срок действия ссылки подтверждения истёк' });
     }
 
     const verifiedAt = verificationToken.user.emailVerifiedAt || new Date();
