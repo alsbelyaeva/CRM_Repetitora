@@ -45,7 +45,7 @@ type CalendarItem =
   | { kind: 'lesson'; id: number; startTime: string; durationMin: number; status: string; title: string; lesson: Lesson }
   | { kind: 'event'; id: number; startTime: string; durationMin: number; status: string; title: string; event: ScheduleEvent };
 
-const APP_TIME_ZONE = 'Europe/Moscow';
+const CALENDAR_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 const eventTypes = [
   { value: 'PERSONAL', label: 'Личное' },
@@ -54,7 +54,7 @@ const eventTypes = [
 
 function getAppDateTimeParts(date: Date) {
   const parts = new Intl.DateTimeFormat('ru-RU', {
-    timeZone: APP_TIME_ZONE,
+    timeZone: CALENDAR_TIME_ZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -86,6 +86,10 @@ function calendarDateKey(date: Date) {
 function timeToInputValue(date: Date) {
   const parts = getAppDateTimeParts(date);
   return `${parts.hour}:${parts.minute}`;
+}
+
+function localDateTimeToIso(date: string, time: string) {
+  return new Date(`${date}T${time}:00`).toISOString();
 }
 
 function getAppIsoWeekday(date: Date) {
@@ -331,8 +335,8 @@ export default function Calendar() {
   const formatLessonTime = (startTime: string, durationMin: number) => {
     const start = new Date(startTime);
     const end = new Date(start.getTime() + durationMin * 60 * 1000);
-    const startStr = start.toLocaleTimeString('ru-RU', { timeZone: APP_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
-    const endStr = end.toLocaleTimeString('ru-RU', { timeZone: APP_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
+    const startStr = start.toLocaleTimeString('ru-RU', { timeZone: CALENDAR_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
+    const endStr = end.toLocaleTimeString('ru-RU', { timeZone: CALENDAR_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
     return `${startStr} - ${endStr}`;
   };
 
@@ -370,7 +374,7 @@ export default function Calendar() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const startDateTime = `${formData.date}T${formData.startTime}:00`;
+    const startDateTime = localDateTimeToIso(formData.date, formData.startTime);
     const startDate = new Date(startDateTime);
     const shouldSaveAsDone = isPastCalendarDay(startDate);
     const operationLabel = editingLesson ? 'обновления занятия' : 'создания занятия';
@@ -402,6 +406,7 @@ export default function Calendar() {
             participantClientIds: formattedData.participantClientIds,
             weekday: formData.repeatWeekday,
             startTime: formData.startTime,
+            timeZone: CALENDAR_TIME_ZONE,
             durationMin: formattedData.durationMin,
             startDate: formData.date,
             endDate: formData.repeatMode === 'date' ? formData.repeatUntil : undefined,
@@ -434,7 +439,7 @@ export default function Calendar() {
         const errorData = error.response.data;
         const conflictItems = errorData.conflictingLessons || errorData.conflicts || (errorData.conflict ? [errorData.conflict] : []);
         const conflictingItems = conflictItems.map((item: any) =>
-          `${item.clientName || item.title || 'Занято'} (${new Date(item.startTime || item.occurrence).toLocaleTimeString('ru-RU', { timeZone: APP_TIME_ZONE, hour: '2-digit', minute: '2-digit' })})`
+          `${item.clientName || item.title || 'Занято'} (${new Date(item.startTime || item.occurrence).toLocaleTimeString('ru-RU', { timeZone: CALENDAR_TIME_ZONE, hour: '2-digit', minute: '2-digit' })})`
         ).join(', ');
         alert(`❌ ${errorData.error}\n\n${errorData.message || `Это время занято: ${conflictingItems}`}\n\nПожалуйста, выберите другое время.`);
       } else {
@@ -454,7 +459,7 @@ export default function Calendar() {
     try {
       const payload = {
         title: eventFormData.title,
-        startTime: `${eventFormData.date}T${eventFormData.startTime}:00`,
+        startTime: localDateTimeToIso(eventFormData.date, eventFormData.startTime),
         durationMin: Number(eventFormData.durationMin),
         type: eventFormData.type,
         location: eventFormData.location || null,
@@ -1133,7 +1138,7 @@ export default function Calendar() {
                 <p className="text-sm text-gray-600">Время</p>
                 <p className="font-semibold">
                   {new Date(selectedLesson.startTime).toLocaleString('ru-RU', {
-                    timeZone: APP_TIME_ZONE,
+                    timeZone: CALENDAR_TIME_ZONE,
                     day: '2-digit',
                     month: '2-digit',
                     year: 'numeric',

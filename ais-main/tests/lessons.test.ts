@@ -95,6 +95,7 @@ describe('Lessons API', () => {
         clientId: seed.secondClient.id,
         weekday: 4,
         startTime: '09:00',
+        timeZone: 'Asia/Yekaterinburg',
         durationMin: 60,
         startDate: '2026-07-23',
         repeatCount: 3,
@@ -106,6 +107,7 @@ describe('Lessons API', () => {
     expect(res.body.series).toHaveProperty('id');
     expect(res.body.lessons).toHaveLength(3);
     expect(res.body.conflicts).toHaveLength(0);
+    expect(new Date(res.body.lessons[0].startTime).toISOString()).toBe('2026-07-23T04:00:00.000Z');
   });
 
   it('POST /api/lessons отклоняет занятие с чужим клиентом', async () => {

@@ -107,11 +107,57 @@ function parseDateOnly(value: string) {
   return new Date(`${value}T00:00:00`);
 }
 
-function buildDateTime(date: Date, time: string) {
+function normalizeTimeZone(value: unknown) {
+  const timeZone = typeof value === 'string' && value.trim()
+    ? value.trim()
+    : process.env.TZ || 'UTC';
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
+    return timeZone;
+  } catch {
+    return process.env.TZ || 'UTC';
+  }
+}
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const get = (type: string) => Number(parts.find(part => part.type === type)?.value || 0);
+  const asUtc = Date.UTC(
+    get('year'),
+    get('month') - 1,
+    get('day'),
+    get('hour'),
+    get('minute'),
+    get('second'),
+  );
+
+  return asUtc - date.getTime();
+}
+
+function buildZonedDateTime(dateValue: string, time: string, timeZone: string) {
+  const [year, month, day] = dateValue.split('-').map(Number);
   const [hours, minutes] = time.split(':').map(Number);
-  const next = new Date(date);
-  next.setHours(hours, minutes, 0, 0);
-  return next;
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+  const firstOffset = getTimeZoneOffsetMs(utcGuess, timeZone);
+  const firstPass = new Date(utcGuess.getTime() - firstOffset);
+  const secondOffset = getTimeZoneOffsetMs(firstPass, timeZone);
+
+  return new Date(utcGuess.getTime() - secondOffset);
+}
+
+function buildDateTime(date: Date, time: string, timeZone = normalizeTimeZone(null)) {
+  return buildZonedDateTime(formatDateOnly(date), time, timeZone);
 }
 
 function formatDateOnly(date: Date) {
@@ -133,7 +179,9 @@ function generateWeeklyOccurrences(options: {
   repeatCount?: number;
   weekday: number;
   startTime: string;
+  timeZone?: string;
 }) {
+  const timeZone = normalizeTimeZone(options.timeZone);
   const startDate = parseDateOnly(options.startDate);
   const endDate = options.endDate ? parseDateOnly(options.endDate) : null;
 
@@ -149,7 +197,7 @@ function generateWeeklyOccurrences(options: {
   const maxCount = Math.min(Math.max(Number(options.repeatCount || 0), 0) || 260, 260);
   while (occurrences.length < maxCount) {
     if (endDate && current > endDate) break;
-    occurrences.push(buildDateTime(current, options.startTime));
+    occurrences.push(buildDateTime(current, options.startTime, timeZone));
     if (!endDate && options.repeatCount && occurrences.length >= options.repeatCount) break;
     current.setDate(current.getDate() + 7);
   }
@@ -842,6 +890,7 @@ router.post('/recurring-series', async (req, res) => {
       participantClientIds,
       weekday,
       startTime,
+      timeZone,
       durationMin,
       startDate,
       endDate,
@@ -912,6 +961,7 @@ router.post('/recurring-series', async (req, res) => {
       repeatCount: normalizedRepeatCount,
       weekday: normalizedWeekday,
       startTime,
+      timeZone,
     });
 
     if (!occurrences || occurrences.length === 0) {
