@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { AlertCircle, CalendarDays, CheckCircle2, Clock, ExternalLink, KeyRound, LayoutGrid, Mail, MessageCircle, Navigation, QrCode, RefreshCw, Save, SlidersHorizontal, Star } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Clock, ExternalLink, KeyRound, LayoutGrid, Mail, MessageCircle, Navigation, QrCode, RefreshCw, Save, Send, SlidersHorizontal, Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppUser, getTeacherOptions, getUserLabel } from '../utils/admin';
 import { getPasswordIssues, getPasswordPolicyError } from '../utils/passwordPolicy';
@@ -176,6 +176,9 @@ export default function Settings() {
   const [botInfo, setBotInfo] = useState<{ configured: boolean; username?: string | null; message?: string | null } | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [telegramTestLoading, setTelegramTestLoading] = useState(false);
+  const [telegramTestMessage, setTelegramTestMessage] = useState<string | null>(null);
+  const [telegramTestError, setTelegramTestError] = useState<string | null>(null);
   const [emailVerificationLoading, setEmailVerificationLoading] = useState(false);
   const [emailVerificationMessage, setEmailVerificationMessage] = useState<string | null>(null);
   const [emailVerificationError, setEmailVerificationError] = useState<string | null>(null);
@@ -204,6 +207,8 @@ export default function Settings() {
     setProfileAddress(currentAddress);
     setSavedProfileTelegramChatId(currentTelegramChatId);
     setProfileMessage(null);
+    setTelegramTestMessage(null);
+    setTelegramTestError(null);
   }, [isAdmin, selectedTeacher?.address, selectedTeacher?.telegramChatId, user?.address, user?.telegramChatId]);
 
   useEffect(() => {
@@ -363,6 +368,29 @@ export default function Settings() {
       setProfileMessage(nextChatId ? 'Telegram подключен' : 'Telegram пока не подключен');
     } catch (error: any) {
       setProfileMessage(error.response?.data?.error || 'Не удалось обновить статус Telegram');
+    }
+  };
+
+  const handleTelegramTestMessage = async () => {
+    if (!targetUserId) {
+      setTelegramTestError('Выберите преподавателя');
+      return;
+    }
+
+    setTelegramTestLoading(true);
+    setTelegramTestMessage(null);
+    setTelegramTestError(null);
+
+    try {
+      const response = await axios.post(`/api/telegram/test-message`, isAdmin ? { userId: targetUserId } : {});
+      setTelegramTestMessage(response.data?.message || 'Тестовое уведомление отправлено в Telegram');
+      await refreshTelegramConnectionStatus();
+    } catch (error: any) {
+      const apiError = error.response?.data;
+      const details = apiError?.details ? ` ${apiError.details}` : '';
+      setTelegramTestError(`${apiError?.error || 'Тестовое уведомление не отправлено.'}${details}`);
+    } finally {
+      setTelegramTestLoading(false);
     }
   };
 
@@ -635,6 +663,18 @@ export default function Settings() {
                     : 'Откройте бота по персональной ссылке или QR-коду и нажмите Start. Chat ID сохранится автоматически.'}
                 </p>
 
+                {telegramTestMessage && (
+                  <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-800">
+                    {telegramTestMessage}
+                  </div>
+                )}
+
+                {telegramTestError && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                    {telegramTestError}
+                  </div>
+                )}
+
                 {isAdmin ? (
                   <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap gap-3 max-w-full">
                     <button
@@ -644,6 +684,15 @@ export default function Settings() {
                     >
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Проверить подключение
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTelegramTestMessage}
+                      disabled={telegramTestLoading || !targetUserId}
+                      className="inline-flex items-center justify-center w-full sm:w-auto bg-sky-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-sky-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      {telegramTestLoading ? 'Отправка...' : 'Отправить тест'}
                     </button>
                     <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
                       Ссылка и QR-код не показываются администратору, чтобы не привязать его Telegram к чужому расписанию.
@@ -666,6 +715,15 @@ export default function Settings() {
                     >
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Проверить подключение
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTelegramTestMessage}
+                      disabled={telegramTestLoading}
+                      className="inline-flex items-center justify-center w-full sm:w-auto bg-sky-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-sky-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      {telegramTestLoading ? 'Отправка...' : 'Отправить тест'}
                     </button>
                     <input
                       value={telegramConnectUrl}
