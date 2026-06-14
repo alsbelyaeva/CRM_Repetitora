@@ -12,6 +12,8 @@ export default function Register() {
     confirmPassword: '',
     fullName: '',
     phone: '',
+    acceptedTerms: false,
+    acceptedPrivacyPolicy: false,
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,6 +41,11 @@ export default function Register() {
       return;
     }
 
+    if (!formData.acceptedTerms || !formData.acceptedPrivacyPolicy) {
+      setError('Для регистрации необходимо принять пользовательское соглашение и дать согласие на обработку персональных данных');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -48,6 +55,8 @@ export default function Register() {
         email: formData.email,
         password: formData.password,
         fullName: formData.fullName,
+        acceptedTerms: formData.acceptedTerms,
+        acceptedPrivacyPolicy: formData.acceptedPrivacyPolicy,
         role: 'TEACHER' // Всегда регистрируем как преподавателя
       });
 
@@ -165,7 +174,7 @@ export default function Register() {
             </div>
           </div>
 
-          <div className="mb-6">
+          <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2">
               Подтвердите пароль <span className="text-red-500">*</span>
             </label>
@@ -179,9 +188,43 @@ export default function Register() {
             />
           </div>
 
+          <div className="mb-6 space-y-3 text-sm text-gray-700">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={formData.acceptedTerms}
+                onChange={(e) => setFormData({ ...formData, acceptedTerms: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                required
+              />
+              <span>
+                Я принимаю{' '}
+                <Link to="/terms" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline">
+                  Пользовательское соглашение
+                </Link>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={formData.acceptedPrivacyPolicy}
+                onChange={(e) => setFormData({ ...formData, acceptedPrivacyPolicy: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                required
+              />
+              <span>
+                Я даю согласие на обработку персональных данных и ознакомлен(а) с{' '}
+                <Link to="/privacy" className="font-semibold text-blue-600 hover:text-blue-800 hover:underline">
+                  Политикой обработки персональных данных
+                </Link>
+              </span>
+            </label>
+          </div>
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !formData.acceptedTerms || !formData.acceptedPrivacyPolicy}
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {loading ? 'Регистрация...' : 'Зарегистрироваться'}
@@ -195,6 +238,14 @@ export default function Register() {
               Войти
             </Link>
           </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-gray-500">
+            <Link to="/terms" className="hover:text-blue-700 hover:underline">
+              Пользовательское соглашение
+            </Link>
+            <Link to="/privacy" className="hover:text-blue-700 hover:underline">
+              Политика обработки персональных данных
+            </Link>
+          </div>
         </div>
       </div>
     </div>

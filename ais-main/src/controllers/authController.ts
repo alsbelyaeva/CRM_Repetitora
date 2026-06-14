@@ -28,11 +28,19 @@ export async function register(req: Request, res: Response) {
   try {
     console.log('🔧 [Auth.register] Регистрация нового пользователя');
     
-    const { email, password, fullName } = req.body;
+    const { email, password, fullName, acceptedTerms, acceptedPrivacyPolicy } = req.body;
 
     if (!email || !password) {
       console.log('❌ [Auth.register] Отсутствует email или пароль');
       return res.status(400).json({ error: 'Email и пароль обязательны' });
+    }
+
+    if (acceptedTerms !== true) {
+      return res.status(400).json({ error: 'Необходимо принять Пользовательское соглашение' });
+    }
+
+    if (acceptedPrivacyPolicy !== true) {
+      return res.status(400).json({ error: 'Необходимо дать согласие на обработку персональных данных' });
     }
 
     const emailValidation = await validateAccountEmail(email);
@@ -60,12 +68,15 @@ export async function register(req: Request, res: Response) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const consentAcceptedAt = new Date();
 
     const user = await prisma.user.create({
       data: {
         email: emailValidation.email,
         passwordHash,
         fullName: fullName || null,
+        acceptedTermsAt: consentAcceptedAt,
+        acceptedPrivacyPolicyAt: consentAcceptedAt,
         role: 'TEACHER',
       },
     });
@@ -102,6 +113,8 @@ export async function register(req: Request, res: Response) {
         fullName: user.fullName,
         emailVerifiedAt: user.emailVerifiedAt,
         emailVerified: Boolean(user.emailVerifiedAt),
+        acceptedTermsAt: user.acceptedTermsAt,
+        acceptedPrivacyPolicyAt: user.acceptedPrivacyPolicyAt,
         address: user.address,
         telegramChatId: user.telegramChatId,
         role: user.role,
@@ -142,6 +155,8 @@ export async function login(req: Request, res: Response) {
         passwordHash: true,
         fullName: true,
         emailVerifiedAt: true,
+        acceptedTermsAt: true,
+        acceptedPrivacyPolicyAt: true,
         address: true,
         telegramChatId: true,
         role: true,
@@ -182,6 +197,8 @@ export async function login(req: Request, res: Response) {
         fullName: user.fullName,
         emailVerifiedAt: user.emailVerifiedAt,
         emailVerified: Boolean(user.emailVerifiedAt),
+        acceptedTermsAt: user.acceptedTermsAt,
+        acceptedPrivacyPolicyAt: user.acceptedPrivacyPolicyAt,
         address: user.address,
         telegramChatId: user.telegramChatId,
         role: user.role,
@@ -611,6 +628,8 @@ export async function getMe(req: Request, res: Response) {
         email: true,
         fullName: true,
         emailVerifiedAt: true,
+        acceptedTermsAt: true,
+        acceptedPrivacyPolicyAt: true,
         address: true,
         telegramChatId: true,
         role: true,

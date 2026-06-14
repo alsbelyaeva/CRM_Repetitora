@@ -13,6 +13,8 @@ model User {
   passwordHash  String         @map("password_hash")
   fullName      String?        @map("full_name")
   emailVerifiedAt DateTime?    @map("email_verified_at")
+  acceptedTermsAt DateTime?    @map("accepted_terms_at")
+  acceptedPrivacyPolicyAt DateTime? @map("accepted_privacy_policy_at")
   address       String?
   telegramChatId String?       @map("telegram_chat_id")
   role          UserRole

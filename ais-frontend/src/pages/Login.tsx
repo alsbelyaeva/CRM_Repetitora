@@ -129,8 +129,14 @@ export default function Login() {
               Зарегистрироваться
             </Link>
           </p>
-          
-          
+          <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-gray-500">
+            <Link to="/terms" className="hover:text-blue-700 hover:underline">
+              Пользовательское соглашение
+            </Link>
+            <Link to="/privacy" className="hover:text-blue-700 hover:underline">
+              Политика обработки персональных данных
+            </Link>
+          </div>
           </div>
         </div>
       </div>

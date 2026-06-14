@@ -3,6 +3,7 @@ import { testPrisma } from './dbReset';
 
 export async function seedTestData() {
   const passwordHash = await bcrypt.hash('Teacher123', 4);
+  const acceptedAt = new Date('2026-06-01T09:00:00+03:00');
 
   const admin = await testPrisma.user.create({
     data: {
@@ -11,6 +12,8 @@ export async function seedTestData() {
       fullName: 'Admin Test',
       role: 'ADMIN',
       address: 'Уфа, улица Ленина, 1',
+      acceptedTermsAt: acceptedAt,
+      acceptedPrivacyPolicyAt: acceptedAt,
     },
   });
 
@@ -21,6 +24,8 @@ export async function seedTestData() {
       fullName: 'Teacher Test',
       role: 'TEACHER',
       address: 'Уфа, проспект Октября, 10',
+      acceptedTermsAt: acceptedAt,
+      acceptedPrivacyPolicyAt: acceptedAt,
     },
   });
 
@@ -30,6 +35,8 @@ export async function seedTestData() {
       passwordHash,
       fullName: 'Other Teacher',
       role: 'TEACHER',
+      acceptedTermsAt: acceptedAt,
+      acceptedPrivacyPolicyAt: acceptedAt,
     },
   });
 

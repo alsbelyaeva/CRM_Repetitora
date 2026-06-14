@@ -7,6 +7,8 @@ interface User {
   email: string;
   emailVerifiedAt?: string | null;
   emailVerified?: boolean;
+  acceptedTermsAt?: string | null;
+  acceptedPrivacyPolicyAt?: string | null;
   fullName?: string;
   address?: string | null;
   telegramChatId?: string | null;

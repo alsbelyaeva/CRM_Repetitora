@@ -37,6 +37,14 @@ components:
         role:
           type: string
           enum: [ADMIN, TEACHER]
+        acceptedTermsAt:
+          type: string
+          format: date-time
+          nullable: true
+        acceptedPrivacyPolicyAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -258,6 +266,8 @@ paths:
               required:
                 - email
                 - password
+                - acceptedTerms
+                - acceptedPrivacyPolicy
               properties:
                 email:
                   type: string
@@ -268,6 +278,12 @@ paths:
                   description: Минимум 8 символов, цифра, строчная и заглавная латинские буквы, без простых шаблонов
                 fullName:
                   type: string
+                acceptedTerms:
+                  type: boolean
+                  description: Пользователь принял пользовательское соглашение
+                acceptedPrivacyPolicy:
+                  type: boolean
+                  description: Пользователь дал согласие на обработку персональных данных
                 role:
                   type: string
                   enum: [ADMIN, TEACHER]

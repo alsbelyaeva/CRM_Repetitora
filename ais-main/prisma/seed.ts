@@ -150,6 +150,8 @@ async function main() {
       address: 'Москва, Тверская улица, 1',
       role: UserRole.ADMIN,
       emailVerifiedAt: verifiedAt,
+      acceptedTermsAt: verifiedAt,
+      acceptedPrivacyPolicyAt: verifiedAt,
     },
   });
 
@@ -161,6 +163,8 @@ async function main() {
       address: 'Москва, Лесная улица, 20',
       role: UserRole.TEACHER,
       emailVerifiedAt: verifiedAt,
+      acceptedTermsAt: verifiedAt,
+      acceptedPrivacyPolicyAt: verifiedAt,
     },
   });
 
@@ -172,6 +176,8 @@ async function main() {
       address: 'Москва, Большая Никитская улица, 22',
       role: UserRole.TEACHER,
       emailVerifiedAt: verifiedAt,
+      acceptedTermsAt: verifiedAt,
+      acceptedPrivacyPolicyAt: verifiedAt,
     },
   });
 

@@ -34,6 +34,8 @@ describe('Auth API', () => {
         password: 'Register123',
         fullName: 'Registered Teacher',
         role: 'ADMIN',
+        acceptedTerms: true,
+        acceptedPrivacyPolicy: true,
       });
 
     expect(res.status).toBe(201);
@@ -41,6 +43,40 @@ describe('Auth API', () => {
     expect(res.body.user.role).toBe('TEACHER');
     expect(res.body.user.emailVerified).toBe(false);
     expect(res.body.user.emailVerifiedAt).toBeNull();
+    expect(res.body.user.acceptedTermsAt).toBeTruthy();
+    expect(res.body.user.acceptedPrivacyPolicyAt).toBeTruthy();
+
+    const user = await testPrisma.user.findUnique({
+      where: { email: 'registered.teacher@example.com' },
+    });
+    expect(user?.acceptedTermsAt).toBeTruthy();
+    expect(user?.acceptedPrivacyPolicyAt).toBeTruthy();
+  });
+
+  it('POST /api/auth/register отклоняет регистрацию без обязательных согласий', async () => {
+    const withoutTerms = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'no.terms@example.com',
+        password: 'Register123',
+        fullName: 'No Terms',
+        acceptedPrivacyPolicy: true,
+      });
+
+    expect(withoutTerms.status).toBe(400);
+    expect(withoutTerms.body.error).toMatch(/Пользовательское соглашение/);
+
+    const withoutPrivacy = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'no.privacy@example.com',
+        password: 'Register123',
+        fullName: 'No Privacy',
+        acceptedTerms: true,
+      });
+
+    expect(withoutPrivacy.status).toBe(400);
+    expect(withoutPrivacy.body.error).toMatch(/обработку персональных данных/);
   });
 
   it('POST /api/auth/login авторизует тестового преподавателя', async () => {

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function Info() {
   return (
     <div className="max-w-2xl w-full">
@@ -15,6 +17,14 @@ export default function Info() {
             crmrepetitora@gmail.com
           </a>
         </p>
+        <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-gray-200 pt-4 text-sm">
+          <Link to="/terms" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline">
+            Пользовательское соглашение
+          </Link>
+          <Link to="/privacy" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline">
+            Политика обработки персональных данных
+          </Link>
+        </div>
       </div>
     </div>
   );
