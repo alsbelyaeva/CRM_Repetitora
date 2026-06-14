@@ -66,6 +66,14 @@ export interface CriterionTextBreakdown {
   travel?: string;
 }
 
+export interface ActiveCriteria {
+  time: boolean;
+  compact: boolean;
+  workingDay: boolean;
+  priority: boolean;
+  travel: boolean;
+}
+
 export interface TravelLeg {
   direction: 'before' | 'after';
   source: 'lesson' | 'event' | 'user_address';
@@ -95,6 +103,7 @@ export interface RankedSlot extends ProposedSlot {
   score: number;
   breakdown: RankingBreakdown;
   weightedBreakdown: RankingBreakdown;
+  activeCriteria: ActiveCriteria;
   criterionReasons: CriterionTextBreakdown;
   travelScore: number;
   travelTimeMinutes: number | null;
@@ -144,6 +153,16 @@ function normalizeWeights(weights: Partial<RankingWeights>): RankingWeights {
     wWorkingDay: raw.wWorkingDay / sum,
     wPriority: raw.wPriority / sum,
     wTravel: raw.wTravel / sum,
+  };
+}
+
+function getActiveCriteria(weights: RankingWeights): ActiveCriteria {
+  return {
+    time: weights.wTime > 0,
+    compact: weights.wCompact > 0,
+    workingDay: weights.wWorkingDay > 0,
+    priority: weights.wPriority > 0,
+    travel: weights.wTravel > 0,
   };
 }
 
@@ -586,6 +605,7 @@ export async function rankSlots(
   clientVip: boolean
 ): Promise<RankedSlot[]> {
   const weights = normalizeWeights(config.weights);
+  const activeCriteria = getActiveCriteria(weights);
 
   const rankedSlots = await Promise.all(proposedSlots.map(async (slot) => {
     const slotStart = new Date(slot.from);
@@ -636,6 +656,7 @@ export async function rankSlots(
         travelScore: roundScore(breakdown.travelScore),
       },
       weightedBreakdown,
+      activeCriteria,
       criterionReasons: buildCriterionReasons(breakdown, clientVip, travelDetails),
       travelScore: roundScore(breakdown.travelScore),
       travelTimeMinutes: travelDetails.travelTimeMinutes,

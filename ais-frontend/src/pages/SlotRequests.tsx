@@ -31,6 +31,13 @@ interface RankedSlot {
     priorityScore: number;
     travelScore: number;
   };
+  activeCriteria?: {
+    time?: boolean;
+    compact?: boolean;
+    workingDay?: boolean;
+    priority?: boolean;
+    travel?: boolean;
+  };
   criterionReasons?: {
     time?: string;
     compact?: string;
@@ -196,6 +203,7 @@ function normalizeSlot(raw: any, fallbackStatus = 'PENDING'): RankedSlot | null 
       score,
       breakdown,
       weightedBreakdown,
+      activeCriteria: raw.activeCriteria ?? undefined,
       criterionReasons: raw.criterionReasons ?? {},
       status: raw.status || fallbackStatus,
       travelScore: Number(raw.travelScore ?? breakdown.travelScore ?? 0.5),
@@ -531,6 +539,7 @@ function getTravelCardDetail(slot: RankedSlot) {
 function getScoreCards(slot: RankedSlot) {
   const contribution = slot.weightedBreakdown || slot.breakdown;
   const reasons = slot.criterionReasons || {};
+  const activeCriteria = slot.activeCriteria;
   const travelCritical = hasCriticalTravel(slot);
   const cards = [
     {
@@ -541,6 +550,7 @@ function getScoreCards(slot: RankedSlot) {
       border: 'border-blue-200',
       text: 'text-blue-700',
       detail: reasons.time,
+      active: activeCriteria?.time !== false,
     },
     {
       key: 'compact',
@@ -550,6 +560,7 @@ function getScoreCards(slot: RankedSlot) {
       border: 'border-purple-200',
       text: 'text-purple-700',
       detail: reasons.compact,
+      active: activeCriteria?.compact !== false,
     },
     {
       key: 'workingDay',
@@ -559,6 +570,7 @@ function getScoreCards(slot: RankedSlot) {
       border: 'border-green-200',
       text: 'text-green-700',
       detail: reasons.workingDay,
+      active: activeCriteria?.workingDay !== false,
     },
     {
       key: 'priority',
@@ -568,6 +580,7 @@ function getScoreCards(slot: RankedSlot) {
       border: 'border-yellow-200',
       text: 'text-yellow-700',
       detail: reasons.priority,
+      active: activeCriteria?.priority !== false,
     },
     {
       key: 'travel',
@@ -578,10 +591,11 @@ function getScoreCards(slot: RankedSlot) {
       text: travelCritical ? 'text-red-700' : 'text-cyan-700',
       detail: getTravelCardDetail(slot) || reasons.travel,
       warning: travelCritical,
+      active: activeCriteria?.travel !== false,
     },
   ];
 
-  return cards;
+  return cards.filter((card) => card.active || card.warning);
 }
 
 export default function SlotRequests() {
@@ -700,6 +714,7 @@ export default function SlotRequests() {
             score: isConfirmedSlot ? slot.score : ranked.score,
             breakdown: ranked.breakdown,
             weightedBreakdown: ranked.weightedBreakdown,
+            activeCriteria: ranked.activeCriteria,
             criterionReasons: ranked.criterionReasons,
             travelScore: ranked.travelScore,
             travelTimeMinutes: ranked.travelTimeMinutes,

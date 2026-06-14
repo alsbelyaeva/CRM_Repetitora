@@ -287,6 +287,13 @@ function buildRecurringConflictSlot(conflict: any, durationMin: number, recurrin
       priorityScore: 0,
       travelScore: 0,
     },
+    activeCriteria: {
+      time: true,
+      compact: true,
+      workingDay: true,
+      priority: true,
+      travel: true,
+    },
     criterionReasons: {},
     status: 'PENDING',
     travelScore: 0,
