@@ -157,7 +157,7 @@ describe('Audit Logs API', () => {
         lessonId: seed.lesson.id,
         amount: 1200,
         method: 'Наличные',
-        dateTime: '2026-06-11T11:30:00+03:00',
+        dateTime: '2026-07-15T11:30:00+03:00',
       });
 
     expect(res.status).toBe(201);

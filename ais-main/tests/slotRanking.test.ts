@@ -25,8 +25,8 @@ describe('Smart Slotting API', () => {
         .send({
           clientId: seed.client.id,
           proposedSlots: [
-            { from: '2026-06-11T12:00:00+03:00', to: '2026-06-11T13:00:00+03:00' },
-            { from: '2026-06-11T10:30:00+03:00', to: '2026-06-11T11:30:00+03:00' },
+            { from: '2026-07-15T12:00:00+03:00', to: '2026-07-15T13:00:00+03:00' },
+            { from: '2026-07-15T10:30:00+03:00', to: '2026-07-15T11:30:00+03:00' },
           ],
         });
 
@@ -46,7 +46,7 @@ describe('Smart Slotting API', () => {
         .send({
           clientId: seed.client.id,
           proposedSlots: [
-            { from: '2026-06-12T18:15:00+03:00', to: '2026-06-12T19:15:00+03:00' },
+            { from: '2026-07-16T18:15:00+03:00', to: '2026-07-16T19:15:00+03:00' },
           ],
         });
 
@@ -75,7 +75,7 @@ describe('Smart Slotting API', () => {
         .send({
           clientId: seed.client.id,
           proposedSlots: [
-            { from: '2026-06-11T12:00:00+03:00', to: '2026-06-11T13:00:00+03:00' },
+            { from: '2026-07-15T12:00:00+03:00', to: '2026-07-15T13:00:00+03:00' },
           ],
         });
 
@@ -96,8 +96,8 @@ describe('Smart Slotting API', () => {
       .send({
         clientId: seed.client.id,
         selectedSlot: {
-          from: '2026-06-12T18:15:00+03:00',
-          to: '2026-06-12T19:15:00+03:00',
+          from: '2026-07-16T18:15:00+03:00',
+          to: '2026-07-16T19:15:00+03:00',
         },
         durationMin: 60,
         type: 'INDIVIDUAL',

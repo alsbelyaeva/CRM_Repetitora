@@ -58,7 +58,7 @@ export async function seedTestData() {
     data: {
       clientId: client.id,
       userId: teacher.id,
-      startTime: new Date('2026-06-11T10:00:00+03:00'),
+      startTime: new Date('2026-07-15T10:00:00+03:00'),
       durationMin: 60,
       type: 'INDIVIDUAL',
       status: 'PLANNED',
@@ -72,7 +72,7 @@ export async function seedTestData() {
     data: {
       userId: teacher.id,
       title: 'Личное событие',
-      startTime: new Date('2026-06-12T18:00:00+03:00'),
+      startTime: new Date('2026-07-16T18:00:00+03:00'),
       durationMin: 60,
       type: 'PERSONAL',
       status: 'ACTIVE',
@@ -86,7 +86,7 @@ export async function seedTestData() {
       lessonId: lesson.id,
       amount: 1500,
       method: 'Наличные',
-      dateTime: new Date('2026-06-11T11:00:00+03:00'),
+      dateTime: new Date('2026-07-15T11:00:00+03:00'),
       note: 'Тестовая оплата',
     },
   });
@@ -98,8 +98,8 @@ export async function seedTestData() {
       status: 'PENDING',
       proposedSlots: [
         {
-          from: '2026-06-11T12:00:00+03:00',
-          to: '2026-06-11T13:00:00+03:00',
+          from: '2026-07-15T12:00:00+03:00',
+          to: '2026-07-15T13:00:00+03:00',
           status: 'PENDING',
         },
       ],

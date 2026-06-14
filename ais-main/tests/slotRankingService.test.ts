@@ -37,7 +37,7 @@ describe('slotRanking service', () => {
     });
 
     const [slot] = await rankSlots(
-      [{ from: '2026-06-11T12:00:00+03:00', to: '2026-06-11T13:00:00+03:00' }],
+      [{ from: '2026-07-15T12:00:00+03:00', to: '2026-07-15T13:00:00+03:00' }],
       [],
       travelOnlyConfig,
       false
@@ -55,7 +55,7 @@ describe('slotRanking service', () => {
     });
 
     const [slot] = await rankSlots(
-      [{ from: '2026-06-11T12:00:00+03:00', to: '2026-06-11T13:00:00+03:00' }],
+      [{ from: '2026-07-15T12:00:00+03:00', to: '2026-07-15T13:00:00+03:00' }],
       [],
       {
         ...travelOnlyConfig,

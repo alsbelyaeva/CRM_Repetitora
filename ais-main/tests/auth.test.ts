@@ -100,7 +100,7 @@ describe('Auth API', () => {
     });
   });
 
-  it('POST /api/auth/email-verification/confirm подтверждает email и инвалидирует ссылку', async () => {
+  it('POST /api/auth/email-verification/confirm подтверждает email и повторно сообщает об успешном подтверждении', async () => {
     const token = 'email-verification-token';
     await testPrisma.emailVerificationToken.create({
       data: {
@@ -125,7 +125,9 @@ describe('Auth API', () => {
       .post('/api/auth/email-verification/confirm')
       .send({ token });
 
-    expect(secondUse.status).toBe(400);
+    expect(secondUse.status).toBe(200);
+    expect(secondUse.body.emailVerified).toBe(true);
+    expect(secondUse.body.message).toBe('Email уже подтверждён.');
   });
 
   it('POST /api/auth/reset-password меняет пароль по действующему токену и инвалидирует его', async () => {
