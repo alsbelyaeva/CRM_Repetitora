@@ -123,6 +123,8 @@ interface SlotInput {
   durationMin: number;
 }
 
+const CALENDAR_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
 type ScoreBreakdown = RankedSlot['breakdown'];
 
 const SCORE_KEYS: Array<keyof ScoreBreakdown> = [
@@ -162,15 +164,12 @@ function deriveWeightedBreakdown(score: number, breakdown: ScoreBreakdown): Scor
   };
 }
 
-function formatToISOLocal(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
+function localDateTimeToIso(date: string, time: string) {
+  return new Date(`${date}T${time}:00`).toISOString();
+}
 
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+function formatToIso(date: Date): string {
+  return date.toISOString();
 }
 
 function normalizeSlot(raw: any, fallbackStatus = 'PENDING'): RankedSlot | null {
@@ -223,8 +222,8 @@ function normalizeSlot(raw: any, fallbackStatus = 'PENDING'): RankedSlot | null 
     const from = new Date(raw.start);
     const to = new Date(from.getTime() + Number(raw.duration) * 60000);
     return {
-      from: formatToISOLocal(from),
-      to: formatToISOLocal(to),
+      from: formatToIso(from),
+      to: formatToIso(to),
       score: 0,
       status: raw.status || fallbackStatus,
       breakdown: {
@@ -788,10 +787,10 @@ export default function SlotRequests() {
     }
 
     const proposedSlots = validSlots.map(slot => {
-      const from = `${slot.date}T${slot.startTime}:00`;
+      const from = localDateTimeToIso(slot.date, slot.startTime);
       const fromDate = new Date(from);
       const toDate = new Date(fromDate.getTime() + slot.durationMin * 60000);
-      return { from, to: formatToISOLocal(toDate) };
+      return { from, to: formatToIso(toDate) };
     });
 
     if (proposedSlots.some(slot => new Date(slot.to) <= new Date(slot.from))) {
@@ -950,6 +949,7 @@ export default function SlotRequests() {
           clientId,
           weekday: getIsoWeekday(from),
           startTime: formatTimeOnly(from),
+          timeZone: CALENDAR_TIME_ZONE,
           durationMin: duration,
           startDate: formatDateOnly(from),
           endDate: slot.recurrence.repeatMode === 'date' ? slot.recurrence.repeatUntil : undefined,
