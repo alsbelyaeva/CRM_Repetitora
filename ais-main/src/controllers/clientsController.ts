@@ -484,6 +484,41 @@ export async function softDelete(req: Request, res: Response) {
       });
     }
 
+    const futurePlannedLesson = await prisma.lesson.findFirst({
+      where: {
+        status: 'PLANNED',
+        startTime: {
+          gte: new Date(),
+        },
+        OR: [
+          { clientId: id },
+          {
+            participants: {
+              some: {
+                clientId: id,
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        startTime: true,
+      },
+      orderBy: {
+        startTime: 'asc',
+      },
+    });
+
+    if (futurePlannedLesson) {
+      return res.status(409).json({
+        error: 'Нельзя удалить клиента, пока у него есть запланированные занятия',
+        message: 'Сначала отмените или перенесите будущие занятия этого клиента.',
+        lessonId: futurePlannedLesson.id,
+        lessonStartTime: futurePlannedLesson.startTime,
+      });
+    }
+
     await prisma.client.update({
       where: { id: id },
       data: { deletedAt: new Date() },
