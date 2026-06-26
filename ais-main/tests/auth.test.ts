@@ -30,7 +30,7 @@ describe('Auth API', () => {
     const res = await request(app)
       .post('/api/auth/register')
       .send({
-        email: 'registered.teacher@example.com',
+        email: 'registered.teacher@mail.ru',
         password: 'Register123',
         fullName: 'Registered Teacher',
         role: 'ADMIN',
@@ -47,10 +47,30 @@ describe('Auth API', () => {
     expect(res.body.user.acceptedPrivacyPolicyAt).toBeTruthy();
 
     const user = await testPrisma.user.findUnique({
-      where: { email: 'registered.teacher@example.com' },
+      where: { email: 'registered.teacher@mail.ru' },
     });
     expect(user?.acceptedTermsAt).toBeTruthy();
     expect(user?.acceptedPrivacyPolicyAt).toBeTruthy();
+  });
+
+  it('POST /api/auth/register отклоняет регистрацию с иностранным доменом email', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'foreign.user@gmail.com',
+        password: 'Register123',
+        fullName: 'Foreign Email',
+        acceptedTerms: true,
+        acceptedPrivacyPolicy: true,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('российских доменах');
+
+    const user = await testPrisma.user.findUnique({
+      where: { email: 'foreign.user@gmail.com' },
+    });
+    expect(user).toBeNull();
   });
 
   it('POST /api/auth/register отклоняет регистрацию без обязательных согласий', async () => {

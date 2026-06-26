@@ -6,6 +6,8 @@ export type EmailDomainCheckResult =
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MX_LOOKUP_TIMEOUT_MS = 4000;
+const RUSSIAN_EMAIL_DOMAIN_SUFFIXES = ['.ru', '.рф', '.su'];
+const RUSSIAN_EMAIL_DOMAIN_ERROR = 'Регистрация доступна только с email на российских доменах (.ru, .рф, .su). Данную почту нельзя зарегистрировать.';
 
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
@@ -17,6 +19,11 @@ export function isEmailFormatValid(email: string) {
 
 export function getEmailDomain(email: string) {
   return normalizeEmail(email).split('@')[1] || '';
+}
+
+export function isRussianEmailDomain(domain: string) {
+  const normalizedDomain = domain.trim().toLowerCase();
+  return RUSSIAN_EMAIL_DOMAIN_SUFFIXES.some(suffix => normalizedDomain.endsWith(suffix));
 }
 
 function isEmailMxCheckDisabled() {
@@ -77,7 +84,13 @@ export async function validateAccountEmail(email: unknown) {
     return { valid: false as const, error: 'Некорректный формат email' };
   }
 
-  const domainCheck = await checkEmailDomainMx(getEmailDomain(normalizedEmail));
+  const domain = getEmailDomain(normalizedEmail);
+
+  if (!isRussianEmailDomain(domain)) {
+    return { valid: false as const, error: RUSSIAN_EMAIL_DOMAIN_ERROR };
+  }
+
+  const domainCheck = await checkEmailDomainMx(domain);
 
   if (!domainCheck.valid) {
     return {

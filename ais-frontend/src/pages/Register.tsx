@@ -4,6 +4,17 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { getPasswordIssues, getPasswordPolicyError } from '../utils/passwordPolicy';
 
+const RUSSIAN_EMAIL_DOMAIN_MESSAGE = 'Регистрация доступна только с email на российских доменах (.ru, .рф, .su). Данную почту нельзя зарегистрировать.';
+const RUSSIAN_EMAIL_DOMAIN_SUFFIXES = ['.ru', '.рф', '.su'];
+
+function getEmailDomainWarning(email: string) {
+  const domain = email.trim().toLowerCase().split('@')[1] || '';
+  if (!domain || !domain.includes('.')) return '';
+
+  return RUSSIAN_EMAIL_DOMAIN_SUFFIXES.some((suffix) => domain.endsWith(suffix))
+    ? ''
+    : RUSSIAN_EMAIL_DOMAIN_MESSAGE;
+}
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -19,6 +30,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const passwordIssues = getPasswordIssues(formData.password);
+  const emailDomainWarning = getEmailDomainWarning(formData.email);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -27,6 +39,11 @@ export default function Register() {
     // Валидация
     if (!formData.email || !formData.password || !formData.fullName) {
       setError('Заполните все обязательные поля');
+      return;
+    }
+
+    if (emailDomainWarning) {
+      setError(emailDomainWarning);
       return;
     }
 
@@ -108,10 +125,19 @@ export default function Register() {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                emailDomainWarning
+                  ? 'border-red-300 focus:ring-red-500'
+                  : 'border-gray-300 focus:ring-blue-500'
+              }`}
               required
-              placeholder="example@email.com"
+              placeholder="example@mail.ru"
             />
+            {emailDomainWarning && (
+              <p className="mt-2 text-sm text-red-600">
+                {emailDomainWarning}
+              </p>
+            )}
           </div>
 
           <div className="mb-4">
@@ -224,7 +250,7 @@ export default function Register() {
 
           <button
             type="submit"
-            disabled={loading || !formData.acceptedTerms || !formData.acceptedPrivacyPolicy}
+            disabled={loading || Boolean(emailDomainWarning) || !formData.acceptedTerms || !formData.acceptedPrivacyPolicy}
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {loading ? 'Регистрация...' : 'Зарегистрироваться'}
